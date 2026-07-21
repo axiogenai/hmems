@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * SCHOOLSITE PRO — WHITE-LABEL CONFIGURATION
+ * HOLY MOTHER ENGLISH MEDIUM SCHOOL — CONFIGURATION
  * ============================================================
  * Change values here to rebrand the entire website for any school.
  * No other files need to be modified for basic rebranding.

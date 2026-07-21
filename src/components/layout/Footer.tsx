@@ -185,7 +185,9 @@ export function Footer() {
       {/* Bottom bar */}
       <div className="border-t border-white/10">
         <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-[11px] text-white/35">© {new Date().getFullYear()} {siteConfig.schoolName}. All rights reserved.</p>
+          <p className="text-[11px] text-white/40">
+            © {new Date().getFullYear()} {siteConfig.schoolName}. All rights reserved. <span className="mx-1 font-bold text-white/20">|</span> <span className="text-emerald-400 font-semibold tracking-wide">Powered by Team Axiogen</span>
+          </p>
           <div className="flex items-center gap-5">
             <Link href="#" className="text-[11px] text-white/35 hover:text-white/60 transition-colors">Privacy Policy</Link>
             <Link href="#" className="text-[11px] text-white/35 hover:text-white/60 transition-colors">Terms of Use</Link>

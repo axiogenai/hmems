@@ -601,7 +601,7 @@ export default function ParentPortalPage() {
                   <input
                     id="loginEmail"
                     type="email"
-                    placeholder="parent@schoolsite.com"
+                    placeholder="parent@example.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-border text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 transition-all font-medium"

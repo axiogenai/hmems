@@ -769,7 +769,7 @@ export default function AdminPortalPage() {
                   <input
                     id="loginEmail"
                     type="email"
-                    placeholder="admin@schoolsite.com"
+                    placeholder="admin@example.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-border text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 transition-all font-medium"

@@ -6,7 +6,7 @@ export default function Loading() {
       <div className="flex flex-col items-center gap-4 text-center">
         <div className="w-12 h-12 rounded-xl border-4 border-accent border-t-transparent animate-spin" />
         <p className="text-sm font-semibold text-primary dark:text-accent-light tracking-wide">
-          Loading SchoolSite Pro...
+          Loading Holy Mother English Medium School...
         </p>
       </div>
     </div>
