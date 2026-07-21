@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Check, X, Shield, BookOpen } from "lucide-react";
+import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { inviteUser } from "@/app/actions/auth";
 
@@ -7,6 +7,7 @@ export function TeachersTab() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -17,6 +18,7 @@ export function TeachersTab() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Assign Class Form
   const [assignClassId, setAssignClassId] = useState("");
@@ -24,14 +26,12 @@ export function TeachersTab() {
 
   const fetchTeachers = async () => {
     setLoading(true);
-    // In a real app with proper foreign keys, you could do a join here to get assignments.
     const { data: teachersData, error } = await supabase
       .from("teachers")
       .select("*")
       .order("created_at", { ascending: false });
     
     if (teachersData) {
-      // Fetch assignments for these teachers
       const { data: assignmentsData } = await supabase
         .from("teacher_assignments")
         .select("*");
@@ -51,9 +51,11 @@ export function TeachersTab() {
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     const res = await inviteUser(newEmail, "teacher", undefined, newName, newPhone);
 
+    setIsSubmitting(false);
     if (res.success) {
       setShowAddModal(false);
       setNewName("");
@@ -63,6 +65,78 @@ export function TeachersTab() {
     } else {
       alert("Failed to add teacher: " + (res.error || "Unknown error"));
     }
+  };
+
+  const handleImportTeachersCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    setIsImporting(true);
+
+    try {
+      const text = await file.text();
+      const rows = text.split("\n").map((r) => r.trim()).filter((r) => r.length > 0).slice(1);
+      let successCount = 0;
+
+      for (const row of rows) {
+        const cols = row.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ''));
+        if (cols.length >= 2 && cols[1]) {
+          const name = cols[0];
+          const email = cols[1];
+          const phone = cols[2] || "";
+          const assignedClass = cols[3] || "";
+          const assignedSubject = cols[4] || "";
+
+          const res = await inviteUser(email, "teacher", undefined, name, phone);
+          if (res.success) {
+            successCount++;
+            if (assignedClass && assignedSubject) {
+              // Fetch newly created teacher ID
+              const { data: teacherProfile } = await supabase
+                .from("teachers")
+                .select("id")
+                .eq("email", email)
+                .single();
+
+              if (teacherProfile?.id) {
+                await supabase.from("teacher_assignments").insert({
+                  teacher_id: teacherProfile.id,
+                  class_id: assignedClass,
+                  subject: assignedSubject
+                });
+              }
+            }
+          }
+        }
+      }
+
+      alert(`Imported ${successCount} teachers successfully! Invitation emails have been sent.`);
+      fetchTeachers();
+    } catch (err: any) {
+      console.error("Teacher CSV Import Error:", err);
+      alert("Failed to parse teacher CSV file.");
+    } finally {
+      setIsImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleExportTeachersCSV = () => {
+    const headers = ["Full Name", "Email Address", "Phone Number", "Status", "Assignments"];
+    const rows = teachers.map((t) => [
+      t.name,
+      t.email,
+      t.phone || "",
+      t.status,
+      t.assignments?.map((a: any) => `${a.class_id}:${a.subject}`).join("; ") || "None"
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `teachers_directory_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleAssignClass = async (e: React.FormEvent) => {
@@ -98,13 +172,26 @@ export function TeachersTab() {
           <h2 className="text-xl font-bold text-slate-800">Teachers Directory</h2>
           <p className="text-sm text-slate-500">Manage teachers and their class assignments</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors"
-        >
-          <Plus size={16} />
-          Add New Teacher
-        </button>
+        <div className="flex gap-2.5 flex-wrap">
+          <label className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm">
+            {isImporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} 
+            {isImporting ? "Importing..." : "Import CSV"}
+            <input type="file" accept=".csv" onChange={handleImportTeachersCSV} disabled={isImporting} className="hidden" />
+          </label>
+          <button
+            onClick={handleExportTeachersCSV}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+          >
+            <Plus size={16} />
+            Add New Teacher
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
@@ -241,9 +328,17 @@ export function TeachersTab() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
-                  Send Invite
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Invite"
+                  )}
                 </button>
               </div>
             </form>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, LogOut, GraduationCap, CreditCard, Bell, MessageSquare,
-  CalendarDays, Settings, ChevronRight, TrendingUp, BookOpen, CheckCircle, Send, Check, X, User, Menu, Eye, EyeOff, ArrowLeft
+  CalendarDays, Settings, ChevronRight, TrendingUp, BookOpen, CheckCircle, Send, Check, X, User, Menu, Eye, EyeOff, ArrowLeft, Loader2
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -88,11 +88,12 @@ const sidebarItems = [
 
 export default function ParentPortalPage() {
   // Global states
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useLocalStorage("school_parent_logged_in", false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -106,25 +107,32 @@ export default function ParentPortalPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setIsLoggingIn(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password: loginPassword,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
 
-    if (error) {
-      setLoginError(error.message);
-      return;
-    }
-
-    if (data.user) {
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-      if (profile && profile.role === "parent") {
-        setIsLoggedIn(true);
-      } else {
-        await supabase.auth.signOut();
-        setLoginError("Unauthorized access. Parent privileges required.");
+      if (error) {
+        setLoginError(error.message);
+        return;
       }
+
+      if (data.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
+        if (profile && profile.role === "parent") {
+          setIsLoggedIn(true);
+        } else {
+          await supabase.auth.signOut();
+          setLoginError("Unauthorized access. Parent privileges required.");
+        }
+      }
+    } catch (err: any) {
+      setLoginError(err.message || "Login failed");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -598,9 +606,17 @@ export default function ParentPortalPage() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full h-12 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all text-base mt-3 cursor-pointer"
+                  disabled={isLoggingIn}
+                  className="w-full h-12 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all text-base mt-3 cursor-pointer disabled:opacity-75 flex items-center justify-center gap-2"
                 >
-                  Secure Login
+                  {isLoggingIn ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    "Secure Login"
+                  )}
                 </button>
               </form>
 

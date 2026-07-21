@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, CheckSquare, BookOpen, FileText, Bell, LogOut,
   BarChart3, Search, Plus, Check, X, GraduationCap, Eye, EyeOff, Menu,
-  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers,
+  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers, Loader2
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -254,11 +254,12 @@ function ClassSelector({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TeacherPortalPage() {
   // Global states
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useLocalStorage("school_teacher_logged_in", false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Check existing session
   useEffect(() => {
@@ -270,6 +271,7 @@ export default function TeacherPortalPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setIsLoggingIn(true);
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -278,6 +280,7 @@ export default function TeacherPortalPage() {
 
     if (error) {
       setLoginError(error.message);
+      setIsLoggingIn(false);
       return;
     }
 
@@ -756,8 +759,16 @@ export default function TeacherPortalPage() {
                   </div>
                 </div>
                 <button type="submit"
-                  className="w-full h-12 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all text-base mt-3 cursor-pointer">
-                  Secure Login
+                  disabled={isLoggingIn}
+                  className="w-full h-12 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all text-base mt-3 cursor-pointer disabled:opacity-75 flex items-center justify-center gap-2">
+                  {isLoggingIn ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    "Secure Login"
+                  )}
                 </button>
               </form>
               <p className="text-center text-xs text-slate-400 mt-6 leading-relaxed font-medium">Demo mode — click login to explore the dashboard</p>
