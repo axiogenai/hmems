@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Rounded Rect Background with Midnight Navy -->
+  <rect width="32" height="32" rx="8" fill="#0F172A"/>
+  <!-- Graduation Cap (Mortarboard) - Emerald Green -->
+  <path d="M16 7L5 13L16 19L27 13L16 7Z" fill="#10B981"/>
+  <!-- Cap Base - Darker Emerald -->
+  <path d="M9 17.5V21.5C9 23.5 12.1 25 16 25C19.9 25 23 23.5 23 21.5V17.5L16 21.3L9 17.5Z" fill="#059669"/>
+  <!-- Tassel - Gold Accent -->
+  <path d="M24 14.5V19.5" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="24" cy="20.5" r="1" fill="#F59E0B"/>
+</svg>
