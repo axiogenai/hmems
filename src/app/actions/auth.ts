@@ -137,7 +137,7 @@ export async function inviteUser(
 export async function linkOrInviteParent(email: string) {
   try {
     // 1. Check if the parent profile already exists
-    const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
+    const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("email", email)
@@ -160,7 +160,23 @@ export async function linkOrInviteParent(email: string) {
       redirectTo 
     }); 
 
-    if (authError) { 
+    if (authError) {
+      console.warn("linkOrInviteParent authError (attempting Auth recovery):", authError.message);
+      
+      // Check if user already exists in Supabase Auth system
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+      const userMatch = usersData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+      if (userMatch) {
+        // Recreate profile for existing Auth user
+        await supabaseAdmin.from("profiles").upsert({
+          id: userMatch.id,
+          email: email,
+          role: "parent"
+        });
+        return { success: true, parentId: userMatch.id };
+      }
+
       return { success: false, error: authError.message }; 
     }
 
@@ -211,24 +227,150 @@ export async function resendPasswordLink(email: string) {
 
 export async function purgeAllTeachers() {
   try {
-    await supabaseAdmin.from("teacher_assignments").delete().not("id", "is", null);
-    await supabaseAdmin.from("teachers").delete().not("id", "is", null);
+    const { data: teacherProfiles } = await supabaseAdmin.from("profiles").select("id").eq("role", "teacher");
+    await supabaseAdmin.from("teacher_assignments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabaseAdmin.from("teachers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await supabaseAdmin.from("profiles").delete().eq("role", "teacher");
+
+    if (teacherProfiles && teacherProfiles.length > 0) {
+      for (const p of teacherProfiles) {
+        await supabaseAdmin.auth.admin.deleteUser(p.id).catch(() => {});
+      }
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to purge teachers." };
   }
 }
 
+export async function bulkPurgeTeachers(teacherIds: string[]) {
+  try {
+    if (!teacherIds || teacherIds.length === 0) return { success: true };
+    await supabaseAdmin.from("teacher_assignments").delete().in("teacher_id", teacherIds);
+    await supabaseAdmin.from("teachers").delete().in("id", teacherIds);
+    await supabaseAdmin.from("profiles").delete().in("id", teacherIds);
+
+    for (const tId of teacherIds) {
+      await supabaseAdmin.auth.admin.deleteUser(tId).catch(() => {});
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to purge selected teachers." };
+  }
+}
+
 export async function purgeAllStudents() {
   try {
-    await supabaseAdmin.from("grades").delete().not("id", "is", null);
-    await supabaseAdmin.from("attendance").delete().not("id", "is", null);
-    await supabaseAdmin.from("fees").delete().not("id", "is", null);
-    await supabaseAdmin.from("students").delete().not("id", "is", null);
+    const { data: parentProfiles } = await supabaseAdmin.from("profiles").select("id").eq("role", "parent");
+    await supabaseAdmin.from("grades").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabaseAdmin.from("attendance").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabaseAdmin.from("fees").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabaseAdmin.from("students").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await supabaseAdmin.from("profiles").delete().eq("role", "parent");
+
+    if (parentProfiles && parentProfiles.length > 0) {
+      for (const p of parentProfiles) {
+        await supabaseAdmin.auth.admin.deleteUser(p.id).catch(() => {});
+      }
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to purge students." };
+  }
+}
+
+export async function bulkPurgeStudents(studentIds: string[]) {
+  try {
+    if (!studentIds || studentIds.length === 0) return { success: true };
+    await supabaseAdmin.from("grades").delete().in("student_id", studentIds);
+    await supabaseAdmin.from("attendance").delete().in("student_id", studentIds);
+    await supabaseAdmin.from("fees").delete().in("student_id", studentIds);
+
+    const { data: stData } = await supabaseAdmin.from("students").select("parent_id").in("id", studentIds);
+    const parentIds = stData?.map(s => s.parent_id).filter(Boolean) as string[];
+
+    await supabaseAdmin.from("students").delete().in("id", studentIds);
+
+    if (parentIds && parentIds.length > 0) {
+      for (const pId of parentIds) {
+        const { data: remaining } = await supabaseAdmin.from("students").select("id").eq("parent_id", pId).limit(1);
+        if (!remaining || remaining.length === 0) {
+          await supabaseAdmin.from("profiles").delete().eq("id", pId);
+          await supabaseAdmin.auth.admin.deleteUser(pId).catch(() => {});
+        }
+      }
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to purge selected students." };
+  }
+}
+
+export async function sendBulkWhatsAppBroadcast(targetGroup: "all" | "parents" | "teachers", messageText: string) {
+  try {
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886";
+
+    let phoneNumbers: string[] = [];
+
+    if (targetGroup === "all" || targetGroup === "parents") {
+      const { data: parentStudents } = await supabaseAdmin.from("students").select("phone");
+      if (parentStudents) {
+        parentStudents.forEach(s => {
+          if (s.phone) phoneNumbers.push(s.phone);
+        });
+      }
+    }
+
+    if (targetGroup === "all" || targetGroup === "teachers") {
+      const { data: teachersData } = await supabaseAdmin.from("teachers").select("phone");
+      if (teachersData) {
+        teachersData.forEach(t => {
+          if (t.phone) phoneNumbers.push(t.phone);
+        });
+      }
+    }
+
+    const uniquePhones = Array.from(new Set(phoneNumbers.map(p => p.trim()).filter(Boolean)));
+
+    if (uniquePhones.length === 0) {
+      return { success: true, count: 0, message: "No phone numbers found in directory" };
+    }
+
+    if (twilioAccountSid && twilioAuthToken) {
+      const authHeader = "Basic " + Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString("base64");
+      let sentCount = 0;
+
+      for (const phone of uniquePhones) {
+        const cleanPhone = phone.replace(/[^0-9]/g, "");
+        const formattedTo = cleanPhone.length === 10 ? `whatsapp:+91${cleanPhone}` : `whatsapp:+${cleanPhone}`;
+
+        const body = new URLSearchParams({
+          From: twilioWhatsAppNumber,
+          To: formattedTo,
+          Body: `*Holy Mother English Medium School*\n\n${messageText}`
+        });
+
+        await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`, {
+          method: "POST",
+          headers: {
+            "Authorization": authHeader,
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: body.toString()
+        }).catch(err => console.warn("Twilio WhatsApp dispatch warning:", err));
+
+        sentCount++;
+      }
+
+      return { success: true, count: sentCount, mode: "API" };
+    }
+
+    return { success: true, count: uniquePhones.length, mode: "Mock" };
+  } catch (err: any) {
+    console.error("Bulk WhatsApp dispatch error:", err);
+    return { success: false, error: err.message };
   }
 }

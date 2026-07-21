@@ -123,12 +123,25 @@ export function CommunicationsTab({
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 bg-accent text-white font-bold rounded-xl text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Send size={13} /> Transmit Broadcast Dispatches
-            </button>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-accent text-white font-bold rounded-xl text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Send size={13} /> Transmit In-App Broadcast
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!message.trim()) return;
+                  const text = encodeURIComponent(`*Holy Mother English Medium School Announcement*\n\n${message.trim()}`);
+                  window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+                }}
+                className="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="text-sm">💬</span> Send via WhatsApp
+              </button>
+            </div>
           </form>
         </div>
 

@@ -1,4 +1,5 @@
-import React, { useState, memo } from "react";
+import React, { useState, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { FormInput } from "@/components/TeacherPortal/FormInput";
@@ -17,6 +18,11 @@ export const FeePaymentModal = memo(function FeePaymentModal({
   fee,
   onPaymentSuccess,
 }: FeePaymentModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const modalRef = useFocusTrap(isOpen, onClose);
   const [method, setMethod] = useState<"Card" | "UPI" | "Net Banking">("Card");
   const [cardDetails, setCardDetails] = useState({ number: "", expiry: "", cvv: "" });
@@ -24,7 +30,7 @@ export const FeePaymentModal = memo(function FeePaymentModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,16 +59,16 @@ export const FeePaymentModal = memo(function FeePaymentModal({
 
     setIsProcessing(true);
 
-    // Mock payment gateway delay
+    // Mock payment gateway processing delay
     setTimeout(() => {
       setIsProcessing(false);
       const referenceNo = "TXN" + Math.floor(Math.random() * 900000000 + 100000000);
       onPaymentSuccess(fee.id, method, referenceNo);
-    }, 2000);
+    }, 1500);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[99999] flex items-center justify-center p-4">
       <motion.div
         ref={modalRef}
         initial={{ scale: 0.95, opacity: 0 }}
@@ -132,7 +138,7 @@ export const FeePaymentModal = memo(function FeePaymentModal({
               <FormInput
                 id="card-num"
                 label="Card Number"
-                placeholder="XXXX XXXX XXXX XXXX"
+                placeholder="4111 2222 3333 4444"
                 value={cardDetails.number}
                 onChange={(e) => {
                   setCardDetails({ ...cardDetails, number: e.target.value });
@@ -146,7 +152,7 @@ export const FeePaymentModal = memo(function FeePaymentModal({
                 <FormInput
                   id="card-expiry"
                   label="Expiry Date"
-                  placeholder="MM/YY"
+                  placeholder="12/28"
                   value={cardDetails.expiry}
                   onChange={(e) => {
                     setCardDetails({ ...cardDetails, expiry: e.target.value });
@@ -158,10 +164,9 @@ export const FeePaymentModal = memo(function FeePaymentModal({
                 />
                 <FormInput
                   id="card-cvv"
-                  label="CVV Code"
+                  label="CVV"
+                  placeholder="123"
                   type="password"
-                  placeholder="***"
-                  maxLength={3}
                   value={cardDetails.cvv}
                   onChange={(e) => {
                     setCardDetails({ ...cardDetails, cvv: e.target.value });
@@ -178,8 +183,8 @@ export const FeePaymentModal = memo(function FeePaymentModal({
           {method === "UPI" && (
             <FormInput
               id="upi-vpa"
-              label="Virtual Payment Address (VPA / UPI ID)"
-              placeholder="e.g., parent@okhdfcbank"
+              label="Virtual Payment Address (VPA)"
+              placeholder="parent@upi"
               value={upiDetails.vpa}
               onChange={(e) => {
                 setUpiDetails({ ...upiDetails, vpa: e.target.value });
@@ -192,40 +197,40 @@ export const FeePaymentModal = memo(function FeePaymentModal({
           )}
 
           {method === "Net Banking" && (
-            <div>
-              <label htmlFor="bank-select" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                Choose Bank Gateway
-              </label>
-              <select
-                id="bank-select"
-                className="w-full px-3 py-2 border border-border rounded-xl text-xs bg-slate-50 focus:outline-none"
-                disabled={isProcessing}
-              >
-                <option value="sbi">State Bank of India</option>
-                <option value="hdfc">HDFC Bank</option>
-                <option value="icici">ICICI Bank</option>
-                <option value="axis">Axis Bank</option>
-              </select>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
+              <p className="text-xs font-semibold text-slate-700">
+                You will be redirected to your net banking portal for verification.
+              </p>
             </div>
           )}
 
-          {/* Action trigger */}
-          <button
-            type="submit"
-            className="w-full py-3 bg-accent hover:bg-accent-light text-white font-bold rounded-xl text-xs shadow-md transition-all mt-4 cursor-pointer flex items-center justify-center gap-2"
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Authorizing Settlement Gateway...
-              </span>
-            ) : (
-              `Authorize Payment of ₹${fee.amount.toLocaleString("en-IN")}`
-            )}
-          </button>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              disabled={isProcessing}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isProcessing}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isProcessing ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Confirm Pay ₹${fee.amount.toLocaleString("en-IN")}`
+              )}
+            </button>
+          </div>
         </form>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 });

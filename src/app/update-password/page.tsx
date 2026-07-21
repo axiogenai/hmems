@@ -16,24 +16,29 @@ export default function UpdatePasswordPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Check if the user is actually logged in (which happens when clicking the invite link)
-    const checkSession = async () => {
-      // Small delay to allow Supabase to process the URL hash if it's a new invite link
-      setTimeout(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setError("Your session has expired or the link is invalid. Please contact the administrator.");
-          return;
-        }
-
-        // Check if they are accidentally still logged in as admin
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        setError(null);
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
         if (profile && profile.role === "admin") {
-          setError("Warning: You are currently logged in as an Admin. If you set a password now, you will change your ADMIN password, not the parent's password. Please log out of the admin dashboard first, or open the email link in an Incognito/Private window.");
+          setError("Warning: You are currently logged in as an Admin. If you set a password now, you will change your ADMIN password, not the user's password. Please log out of the admin dashboard first, or open the link in an Incognito window.");
+        }
+      }
+    });
+
+    const checkSession = async () => {
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session && !window.location.hash.includes("access_token")) {
+          setError("Your session has expired or the link is invalid. Please request a new link from the administrator.");
         }
       }, 500);
     };
     checkSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {

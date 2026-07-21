@@ -10,7 +10,7 @@ import {
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { supabase } from "@/lib/supabase";
-import { linkOrInviteParent } from "@/app/actions/auth";
+import { linkOrInviteParent, sendBulkWhatsAppBroadcast } from "@/app/actions/auth";
 
 // Import types & enums
 import {
@@ -436,9 +436,51 @@ export default function AdminPortalPage() {
     await supabase.from("students").update({ deleted_at: null }).eq("id", studentId);
   };
 
+function normalizeGrade(rawGrade: string, targetClass?: string): string {
+  if (targetClass && targetClass !== "ALL") {
+    if (!rawGrade || rawGrade.trim() === "" || rawGrade.trim().toUpperCase() === targetClass.trim().toUpperCase()) {
+      return targetClass;
+    }
+  }
+
+  const raw = (rawGrade || "").trim();
+  if (!raw && targetClass) return targetClass;
+  if (!raw) return "Class I-A";
+
+  const g = raw.toUpperCase().replace(/^CLASS\s+/i, "");
+
+  const romanMap: Record<string, string> = {
+    "1-A": "Class I-A", "1 A": "Class I-A", "I-A": "Class I-A", "1A": "Class I-A", "CLASS 1-A": "Class I-A", "CLASS 1A": "Class I-A",
+    "1-B": "Class I-B", "1 B": "Class I-B", "I-B": "Class I-B", "1B": "Class I-B", "CLASS 1-B": "Class I-B", "CLASS 1B": "Class I-B",
+    "2-A": "Class II-A", "2 A": "Class II-A", "II-A": "Class II-A", "2A": "Class II-A", "CLASS 2-A": "Class II-A", "CLASS 2A": "Class II-A",
+    "2-B": "Class II-B", "2 B": "Class II-B", "II-B": "Class II-B", "2B": "Class II-B", "CLASS 2-B": "Class II-B", "CLASS 2B": "Class II-B",
+    "3-A": "Class III-A", "3 A": "Class III-A", "III-A": "Class III-A", "3A": "Class III-A", "CLASS 3-A": "Class III-A", "CLASS 3A": "Class III-A",
+    "3-B": "Class III-B", "3 B": "Class III-B", "III-B": "Class III-B", "3B": "Class III-B", "CLASS 3-B": "Class III-B", "CLASS 3B": "Class III-B",
+    "4-A": "Class IV-A", "4 A": "Class IV-A", "IV-A": "Class IV-A", "4A": "Class IV-A", "CLASS 4-A": "Class IV-A", "CLASS 4A": "Class IV-A",
+    "4-B": "Class IV-B", "4 B": "Class IV-B", "IV-B": "Class IV-B", "4B": "Class IV-B", "CLASS 4-B": "Class IV-B", "CLASS 4B": "Class IV-B",
+    "5-A": "Class V-A", "5 A": "Class V-A", "V-A": "Class V-A", "5A": "Class V-A", "CLASS 5-A": "Class V-A", "CLASS 5A": "Class V-A",
+    "5-B": "Class V-B", "5 B": "Class V-B", "V-B": "Class V-B", "5B": "Class V-B", "CLASS 5-B": "Class V-B", "CLASS 5B": "Class V-B",
+    "6-A": "Class VI-A", "6 A": "Class VI-A", "VI-A": "Class VI-A", "6A": "Class VI-A", "CLASS 6-A": "Class VI-A", "CLASS 6A": "Class VI-A",
+    "6-B": "Class VI-B", "6 B": "Class VI-B", "VI-B": "Class VI-B", "6B": "Class VI-B", "CLASS 6-B": "Class VI-B", "CLASS 6B": "Class VI-B",
+    "7-A": "Class VII-A", "7 A": "Class VII-A", "VII-A": "Class VII-A", "7A": "Class VII-A", "CLASS 7-A": "Class VII-A", "CLASS 7A": "Class VII-A",
+    "7-B": "Class VII-B", "7 B": "Class VII-B", "VII-B": "Class VII-B", "7B": "Class VII-B", "CLASS 7-B": "Class VII-B", "CLASS 7B": "Class VII-B",
+    "8-A": "Class VIII-A", "8 A": "Class VIII-A", "VIII-A": "Class VIII-A", "8A": "Class VIII-A", "CLASS 8-A": "Class VIII-A", "CLASS 8A": "Class VIII-A",
+    "8-B": "Class VIII-B", "8 B": "Class VIII-B", "VIII-B": "Class VIII-B", "8B": "Class VIII-B", "CLASS 8-B": "Class VIII-B", "CLASS 8B": "Class VIII-B",
+    "9-A": "Class IX-A", "9 A": "Class IX-A", "IX-A": "Class IX-A", "9A": "Class IX-A", "CLASS 9-A": "Class IX-A", "CLASS 9A": "Class IX-A",
+    "9-B": "Class IX-B", "9 B": "Class IX-B", "IX-B": "Class IX-B", "9B": "Class IX-B", "CLASS 9-B": "Class IX-B", "CLASS 9B": "Class IX-B",
+    "10-A": "Class X-A", "10 A": "Class X-A", "X-A": "Class X-A", "10A": "Class X-A", "CLASS 10-A": "Class X-A", "CLASS 10A": "Class X-A",
+    "10-B": "Class X-B", "10 B": "Class X-B", "X-B": "Class X-B", "10B": "Class X-B", "CLASS 10-B": "Class X-B", "CLASS 10B": "Class X-B",
+    "NURSERY": "Nursery", "LKG": "LKG", "UKG": "UKG"
+  };
+
+  if (romanMap[g]) return romanMap[g];
+  if (targetClass) return targetClass;
+  return raw.startsWith("Class ") ? raw : `Class ${raw}`;
+}
+
   const [isImportingStudentCSV, setIsImportingStudentCSV] = useState(false);
 
-  const handleImportCSV = async (file: File) => {
+  const handleImportCSV = async (file: File, targetClass?: string) => {
     setIsImportingStudentCSV(true);
     try {
       const text = await file.text();
@@ -452,34 +494,54 @@ export default function AdminPortalPage() {
       const rows = rawRows.slice(startIdx);
 
       // Existing student map for fast duplicate detection
-      const existingMap = new Set(students.map(s => `${s.grade.toLowerCase().trim()}_${s.rollNo.toLowerCase().trim()}`));
+      const existingMap = new Set(
+        students.map(s => {
+          const cleanG = s.grade.toLowerCase().replace(/^class\s+/i, "").trim();
+          return `${cleanG}_${s.rollNo.toLowerCase().trim()}`;
+        })
+      );
 
       for (const row of rows) {
         try {
           const cols = row.split(",").map(c => c.trim().replace(/^["']|["']$/g, ''));
-          if (cols.length >= 4 && cols[0]) {
+          if (cols.length >= 3 && cols[0]) {
             let rollNo = cols[0];
             let name = cols[1];
-            let grade = cols[2];
+            let rawGrade = "";
             let section = "";
             let parentName = "";
             let parentEmail = "";
             let phone = "";
 
             if (cols.length >= 6) {
+              rawGrade = cols[2];
               section = cols[3];
               parentName = cols[4];
               parentEmail = cols[5];
               phone = cols[6] || "";
             } else if (cols.length === 5) {
+              rawGrade = cols[2];
               parentName = cols[3];
               parentEmail = cols[4];
+            } else if (cols.length === 4) {
+              if (cols[3].includes("@")) {
+                parentName = cols[2];
+                parentEmail = cols[3];
+                rawGrade = targetClass || "";
+              } else {
+                rawGrade = cols[2];
+                parentName = cols[3];
+              }
             } else {
-              parentName = cols[3];
+              parentName = cols[2];
+              rawGrade = targetClass || "";
             }
 
+            const grade = normalizeGrade(rawGrade, targetClass);
+            const cleanG = grade.toLowerCase().replace(/^class\s+/i, "").trim();
+
             // DUPLICATE CHECK: If student with same grade + rollNo already exists, skip duplicate & continue!
-            const dupeKey = `${grade.toLowerCase().trim()}_${rollNo.toLowerCase().trim()}`;
+            const dupeKey = `${cleanG}_${rollNo.toLowerCase().trim()}`;
             if (existingMap.has(dupeKey)) {
               skippedCount++;
               continue;
@@ -685,13 +747,22 @@ export default function AdminPortalPage() {
     logActivity(`Broadcast dispatched to ${target} (Recipients: ${dispatch.recipients})`, "success");
     setTimeout(() => setBroadcastSuccess(false), 3000);
     
-    // Write to announcements table
-    await supabase.from("announcements").insert({
-      id: dispatch.id,
-      title: `Broadcast to ${target}`,
-      content: msg,
-      target: target
-    });
+    // Write to announcements table in Supabase & trigger bulk WhatsApp API
+    try {
+      const cleanTitle = msg.length > 40 ? `${msg.substring(0, 40)}...` : msg;
+      await supabase.from("announcements").insert({
+        id: crypto.randomUUID(),
+        title: cleanTitle,
+        content: msg,
+        target: target === "teachers" ? "Teachers" : "All",
+        priority: "High"
+      });
+
+      // Automated WhatsApp dispatch call to all target parents & teachers
+      await sendBulkWhatsAppBroadcast(target, msg);
+    } catch (err) {
+      console.warn("Broadcast announcement insert error:", err);
+    }
   };
 
   // 6. Analytics HTML Report generation
@@ -956,7 +1027,7 @@ export default function AdminPortalPage() {
             )}
 
             {activeTab === "students" && (
-              <motion.div key="students" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <motion.div key="students" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <StudentsTab
                   students={students}
                   studentSearch={studentSearch}
@@ -974,7 +1045,7 @@ export default function AdminPortalPage() {
             )}
 
             {activeTab === "teachers" && (
-              <motion.div key="teachers" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <motion.div key="teachers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <TeachersTab />
               </motion.div>
             )}

@@ -126,14 +126,26 @@ export function CommunicationsTab({
         {/* Messaging Box */}
         <div className="md:col-span-2 flex flex-col h-[450px] md:h-auto">
           {/* Box Header */}
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center text-xs font-bold">
-              {selectedContact.initial}
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center text-xs font-bold">
+                {selectedContact.initial}
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 text-xs sm:text-sm">{selectedContact.name}</p>
+                <p className="text-[10px] text-slate-400 font-semibold">{selectedContact.subject} · Class Teacher</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-slate-800 text-xs sm:text-sm">{selectedContact.name}</p>
-              <p className="text-[10px] text-slate-400 font-semibold">{selectedContact.subject} · Class Teacher</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const text = encodeURIComponent(`Respected ${selectedContact.name}, regarding my child's performance in ${selectedContact.subject}...`);
+                window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+              }}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span>💬</span> WhatsApp
+            </button>
           </div>
 
           {/* Messages Body */}
