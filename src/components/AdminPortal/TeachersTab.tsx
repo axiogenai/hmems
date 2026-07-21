@@ -18,6 +18,8 @@ export function TeachersTab() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newClassId, setNewClassId] = useState("");
+  const [newSubject, setNewSubject] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Assign Class Form
@@ -55,14 +57,34 @@ export function TeachersTab() {
     
     const res = await inviteUser(newEmail, "teacher", undefined, newName, newPhone);
 
-    setIsSubmitting(false);
     if (res.success) {
+      if (newClassId && newSubject) {
+        // Fetch teacher ID
+        const { data: teacherProfile } = await supabase
+          .from("teachers")
+          .select("id")
+          .eq("email", newEmail)
+          .single();
+
+        if (teacherProfile?.id) {
+          await supabase.from("teacher_assignments").insert({
+            teacher_id: teacherProfile.id,
+            class_id: newClassId,
+            subject: newSubject
+          });
+        }
+      }
+
+      setIsSubmitting(false);
       setShowAddModal(false);
       setNewName("");
       setNewEmail("");
       setNewPhone("");
+      setNewClassId("");
+      setNewSubject("");
       fetchTeachers();
     } else {
+      setIsSubmitting(false);
       alert("Failed to add teacher: " + (res.error || "Unknown error"));
     }
   };
@@ -315,8 +337,30 @@ export function TeachersTab() {
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+91 98765 43210"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assign Class</label>
+                  <input
+                    type="text"
+                    value={newClassId}
+                    onChange={(e) => setNewClassId(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                    placeholder="e.g. IX-A"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assign Subject</label>
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                    placeholder="e.g. Science"
+                  />
+                </div>
               </div>
               <div className="pt-4 flex gap-3">
                 <button
