@@ -11,23 +11,26 @@ const supabaseAdmin = createClient(
 );
 
 async function getSiteUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
-  }
   try {
     const headersList = await headers();
     const host = headersList.get("host");
     const proto = headersList.get("x-forwarded-proto") || "https";
-    if (host) {
+    if (host && !host.includes("localhost")) {
       return `${proto}://${host}`.replace(/\/$/, "");
     }
   } catch {
     // fallback
   }
-  return "";
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
+  }
+
+  if (process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_SITE_URL.includes("localhost")) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+
+  return "https://holymotherenglishmediumschool.vercel.app";
 }
 
 export async function inviteUser(

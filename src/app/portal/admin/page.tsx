@@ -439,10 +439,13 @@ export default function AdminPortalPage() {
   const handleImportCSV = async (file: File) => {
     try {
       const text = await file.text();
-      const rows = text.split("\n").map(r => r.trim()).filter(r => r.length > 0).slice(1);
+      const rawRows = text.split(/\r?\n/).map(r => r.trim()).filter(r => r.length > 0);
       const imported: Student[] = [];
       const dbRows: any[] = [];
       let invitedCount = 0;
+
+      const startIdx = (rawRows.length > 0 && /roll|student|name|grade|parent/i.test(rawRows[0])) ? 1 : 0;
+      const rows = rawRows.slice(startIdx);
 
       for (const row of rows) {
         const cols = row.split(",").map(c => c.trim().replace(/^["']|["']$/g, ''));
@@ -510,17 +513,17 @@ export default function AdminPortalPage() {
         return;
       }
 
-      setStudents((prev) => [...prev, ...imported]);
-      logActivity(`Imported ${imported.length} student profiles from CSV (${invitedCount} parent invites sent)`, "success");
+      // Batch insert into database
+      await supabase.from("students").insert(dbRows);
+
+      setStudents(prev => [...prev, ...imported]);
+      logActivity(`Bulk imported ${imported.length} student records via CSV`, "success");
       setDialogAction({ 
         type: "alert", 
         variant: "success", 
         title: "Import Successful", 
         message: `Imported ${imported.length} students successfully! ${invitedCount > 0 ? `Sent ${invitedCount} parent invitation emails with password setup links.` : ''}` 
       });
-      
-      // Batch insert into database
-      await supabase.from("students").insert(dbRows);
     } catch (err: any) {
       console.error("CSV Import error:", err);
       setDialogAction({ type: "alert", variant: "danger", title: "Import Failed", message: "Failed to parse CSV spreadsheet file. Verify row alignment formatting." });
