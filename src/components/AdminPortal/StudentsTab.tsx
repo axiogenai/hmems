@@ -47,8 +47,8 @@ export function StudentsTab({
       setToast({
         id: Date.now().toString(),
         type: "success",
-        title: "Parent Setup Link Resent",
-        message: `Fresh password setup link emailed to parent (${email}).`
+        title: "Parent Setup Link Sent",
+        message: `Password setup link successfully emailed to parent (${email}).`
       });
     } else {
       setToast({

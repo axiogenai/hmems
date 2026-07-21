@@ -830,7 +830,7 @@ export default function TeacherPortalPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Set / Reset Password</h3>
-                  <p className="text-xs text-slate-500 mt-0.5 font-medium">Receive a password link pointing to the live site</p>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">Receive a password setup link via email</p>
                 </div>
                 <button
                   type="button"

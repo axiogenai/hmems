@@ -38,8 +38,8 @@ export function TeachersTab() {
       setToast({
         id: Date.now().toString(),
         type: "success",
-        title: "Password Setup Link Resent",
-        message: `Fresh password setup link emailed to ${email}. Redirects directly to production site.`
+        title: "Password Setup Link Sent",
+        message: `Password setup link successfully emailed to ${email}.`
       });
     } else {
       setToast({
