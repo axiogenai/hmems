@@ -50,33 +50,45 @@ export async function inviteUser(
     });
 
     if (authError) {
-      console.error("Error inviting user:", authError);
-      // If user already exists in Auth, check and ensure profile & teacher record exist
-      const { data: existingProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("id, role")
-        .eq("email", email)
-        .single();
+      console.error("Error inviting user (attempting recovery):", authError);
+      
+      // Fetch user from Auth admin list
+      let userId: string | null = null;
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+      const userMatch = usersData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (userMatch) {
+        userId = userMatch.id;
+      }
 
-      if (existingProfile && existingProfile.id) {
+      if (!userId) {
+        // Fallback: check profile by email
+        const { data: profile } = await supabaseAdmin.from("profiles").select("id").eq("email", email).single();
+        if (profile) userId = profile.id;
+      }
+
+      if (userId) {
+        // Upsert profile
+        await supabaseAdmin.from("profiles").upsert({
+          id: userId,
+          email: email,
+          role: role,
+          linked_entity_id: linkedEntityId || null
+        });
+
+        // If teacher, upsert teacher record
         if (role === "teacher") {
-          const { data: existingTeacher } = await supabaseAdmin
-            .from("teachers")
-            .select("id")
-            .eq("id", existingProfile.id)
-            .single();
-
-          if (!existingTeacher) {
-            await supabaseAdmin.from("teachers").insert({
-              id: existingProfile.id,
-              name: name || email.split("@")[0],
-              email: email,
-              phone: phone || null,
-              status: "Active"
-            });
-          }
+          const { data: existingTeacher } = await supabaseAdmin.from("teachers").select("id").eq("email", email).single();
+          const teacherIdToUse = existingTeacher?.id || userId;
+          
+          await supabaseAdmin.from("teachers").upsert({
+            id: teacherIdToUse,
+            name: name || email.split("@")[0],
+            email: email,
+            phone: phone || null,
+            status: "Active"
+          });
         }
-        return { success: true, alreadyExisted: true, userId: existingProfile.id };
+        return { success: true, alreadyExisted: true, userId };
       }
 
       return { success: false, error: authError.message };

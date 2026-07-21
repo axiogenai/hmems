@@ -341,89 +341,110 @@ export function TeachersTab() {
 
       {/* ADD TEACHER MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800">Add New Teacher</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Add New Teacher</h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Register faculty member & send email invite link</p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer"
+              >
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleAddTeacher} className="p-6 space-y-4">
+
+            <form onSubmit={handleAddTeacher} className="p-8 space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
-                  placeholder="e.g. Mr. John Doe"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
+                  placeholder="e.g. Mr. Rahul Patil"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="email"
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
                   placeholder="teacher@school.com"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Phone Number
+                </label>
                 <input
                   type="text"
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
                   placeholder="+91 98765 43210"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-2 gap-4 pt-1">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assign Class</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Assign Class / Section
+                  </label>
                   <input
                     type="text"
                     value={newClassId}
                     onChange={(e) => setNewClassId(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
                     placeholder="e.g. IX-A"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assign Subject</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Assign Subject
+                  </label>
                   <input
                     type="text"
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
-                    placeholder="e.g. Science"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
+                    placeholder="e.g. Mathematics"
                   />
                 </div>
               </div>
-              <div className="pt-4 flex gap-3">
+
+              <div className="pt-6 flex items-center gap-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                  className="flex-1 py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                  className="flex-1 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Sending...
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending Invite...
                     </>
                   ) : (
-                    "Send Invite"
+                    "Send Invitation"
                   )}
                 </button>
               </div>
@@ -434,52 +455,61 @@ export function TeachersTab() {
 
       {/* ASSIGN CLASS MODAL */}
       {showAssignModal && selectedTeacher && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-slate-50/50">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Assign Class</h3>
-                <p className="text-xs text-slate-500">For {selectedTeacher.name}</p>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Assign Class & Subject</h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Faculty Member: <strong className="text-slate-800">{selectedTeacher.name}</strong></p>
               </div>
-              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer"
+              >
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleAssignClass} className="p-6 space-y-4">
+
+            <form onSubmit={handleAssignClass} className="p-8 space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Class / Section</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Class / Section <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={assignClassId}
                   onChange={(e) => setAssignClassId(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
                   placeholder="e.g. IX-A"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Subject</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Subject <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={assignSubject}
                   onChange={(e) => setAssignSubject(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
                   placeholder="e.g. Mathematics"
                 />
               </div>
               
-              <div className="pt-4 flex gap-3">
+              <div className="pt-6 flex items-center gap-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAssignModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                  className="flex-1 py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
+                  className="flex-1 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
                 >
                   Save Assignment
                 </button>
