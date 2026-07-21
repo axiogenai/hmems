@@ -184,17 +184,17 @@ export default function ParentPortalPage() {
 
         setParentEmailAddress(user.email || "");
 
-        // Fetch parent's children (students linked by parent_id)
+        // Fetch parent's children (students linked by parent_id or parent email)
         const { data: kidsData, error: kidsError } = await supabase
           .from("students")
           .select("*")
-          .eq("parent_id", user.id);
+          .or(`parent_id.eq.${user.id},email.eq.${user.email}`);
 
         if (kidsError) throw kidsError;
 
         if (kidsData && kidsData.length > 0) {
-          // Parent name from first student's parent name entry
-          setParentName(kidsData[0].parent || "Parent");
+          // Parent name from student's parent name entry or email
+          setParentName(kidsData[0].parent || (user.email ? user.email.split('@')[0] : "Parent"));
 
           const mappedChildren: StudentProfile[] = kidsData.map(k => ({
             id: k.id,

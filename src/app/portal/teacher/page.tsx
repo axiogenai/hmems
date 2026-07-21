@@ -305,6 +305,14 @@ export default function TeacherPortalPage() {
   const [activeTab, setActiveTab]       = useState("dashboard");
   const [sidebarOpen, setSidebarOpen]   = useState(false);
 
+  // Logged in teacher profile
+  const [currentTeacher, setCurrentTeacher] = useState({
+    name: TEACHER_PROFILE.name,
+    initials: TEACHER_PROFILE.initials,
+    email: TEACHER_PROFILE.email,
+    slots: TEACHER_PROFILE.slots
+  });
+
   // Active class-subject selection
   const [dynamicSlots, setDynamicSlots] = useState<ClassSubjectSlot[]>(TEACHER_PROFILE.slots);
   const [dynamicRosters, setDynamicRosters] = useState<Record<string, Student[]>>(CLASS_ROSTERS);
@@ -331,48 +339,72 @@ export default function TeacherPortalPage() {
         let teacherSlots = TEACHER_PROFILE.slots;
         let rosters = CLASS_ROSTERS;
 
-        if (user) {
-          // 1. Fetch Teacher ID from profiles or teachers table
-          const { data: teacherProfile } = await supabase.from('teachers').select('id').eq('id', user.id).single();
+        if (user && user.email) {
+          // 1. Fetch Teacher record from DB by email OR id
+          const { data: teacherRecord } = await supabase
+            .from('teachers')
+            .select('*')
+            .or(`email.eq.${user.email},id.eq.${user.id}`)
+            .maybeSingle();
           
-          if (teacherProfile) {
-            // 2. Fetch Assignments
-            const { data: assignments } = await supabase.from('teacher_assignments').select('*').eq('teacher_id', teacherProfile.id);
-            
-            if (assignments && assignments.length > 0) {
-              teacherSlots = assignments.map((a: any) => ({
-                classId: a.class_id,
-                subject: a.subject,
-              }));
-              
-              setDynamicSlots(teacherSlots);
-              setActiveSlot(teacherSlots[0]);
+          let teacherName = teacherRecord?.name || user.email.split('@')[0];
+          if (!teacherRecord && teacherName.toLowerCase().startsWith('admin')) {
+            teacherName = "Faculty Member";
+          }
 
-              // 3. Fetch Students for these classes
-              const classIds = [...new Set(teacherSlots.map(s => s.classId))];
-              rosters = {};
-              
-              for (const classId of classIds) {
-                const [grade, section] = classId.split('-');
-                let query = supabase.from('students').select('*').eq('grade', grade);
-                if (section) query = query.eq('section', section);
-                
-                const { data: students } = await query;
-                if (students) {
-                  rosters[classId] = students.map(s => ({
-                    id: s.id,
-                    name: s.name,
-                    rollNo: s.roll_no,
-                    phone: s.phone || '',
-                    email: s.email || ''
-                  })) as any;
-                } else {
-                  rosters[classId] = [];
-                }
-              }
-              setDynamicRosters(rosters);
+          const nameParts = teacherName.trim().split(" ");
+          const initials = nameParts.length >= 2 
+            ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+            : teacherName.substring(0, 2).toUpperCase();
+
+          const teacherIdToUse = teacherRecord?.id || user.id;
+
+          // 2. Fetch Assignments
+          const { data: assignments } = await supabase
+            .from('teacher_assignments')
+            .select('*')
+            .eq('teacher_id', teacherIdToUse);
+          
+          if (assignments && assignments.length > 0) {
+            teacherSlots = assignments.map((a: any) => ({
+              classId: a.class_id,
+              subject: a.subject,
+            }));
+          }
+
+          setCurrentTeacher({
+            name: teacherName,
+            initials: initials,
+            email: user.email,
+            slots: teacherSlots
+          });
+
+          setDynamicSlots(teacherSlots);
+          setActiveSlot(teacherSlots[0]);
+
+          // 3. Fetch Students for these classes
+          const classIds = [...new Set(teacherSlots.map(s => s.classId))];
+          rosters = {};
+          
+          for (const classId of classIds) {
+            const [grade, section] = classId.split('-');
+            let query = supabase.from('students').select('*').eq('grade', grade);
+            if (section) query = query.eq('section', section);
+            
+            const { data: students } = await query;
+            if (students) {
+              rosters[classId] = students.map(s => ({
+                id: s.id,
+                name: s.name,
+                rollNo: s.roll_no,
+                phone: s.phone || '',
+                email: s.email || ''
+              })) as any;
+            } else {
+              rosters[classId] = [];
             }
           }
+          setDynamicRosters(rosters);
         }
 
         const classIds = teacherSlots.map(s => s.classId);
@@ -905,7 +937,7 @@ export default function TeacherPortalPage() {
         {/* Class summary pills */}
         <div className="px-4 pt-4 pb-2 space-y-1.5">
           <p className="text-[9px] font-extrabold uppercase tracking-widest text-white/30 px-2 mb-2">My Classes</p>
-          {TEACHER_PROFILE.slots.map((slot) => {
+          {currentTeacher.slots.map((slot) => {
             const isActive = slot.classId === activeSlot.classId && slot.subject === activeSlot.subject;
             return (
               <button
@@ -941,11 +973,11 @@ export default function TeacherPortalPage() {
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {TEACHER_PROFILE.initials}
+              {currentTeacher.initials}
             </div>
             <div className="min-w-0">
-              <p className="text-white text-sm font-medium truncate">{TEACHER_PROFILE.name}</p>
-              <p className="text-white/40 text-xs truncate">{TEACHER_PROFILE.slots.length} classes assigned</p>
+              <p className="text-white text-sm font-medium truncate">{currentTeacher.name}</p>
+              <p className="text-white/40 text-xs truncate">{currentTeacher.slots.length} classes assigned</p>
             </div>
           </div>
           <button onClick={handleSignOut} className="flex items-center gap-2 text-white/40 hover:text-white text-xs transition-colors cursor-pointer">
@@ -999,7 +1031,7 @@ export default function TeacherPortalPage() {
               {/* Mobile class selector */}
               <div className="px-4 pt-4 pb-2 space-y-1.5">
                 <p className="text-[9px] font-extrabold uppercase tracking-widest text-white/30 px-2 mb-2">My Classes</p>
-                {TEACHER_PROFILE.slots.map((slot) => {
+                {currentTeacher.slots.map((slot) => {
                   const isActive = slot.classId === activeSlot.classId && slot.subject === activeSlot.subject;
                   return (
                     <button
@@ -1035,11 +1067,11 @@ export default function TeacherPortalPage() {
               <div className="p-4 border-t border-white/10">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                    {TEACHER_PROFILE.initials}
+                    {currentTeacher.initials}
                   </div>
                   <div>
-                    <p className="text-white text-sm font-medium">{TEACHER_PROFILE.name}</p>
-                    <p className="text-white/40 text-xs">{TEACHER_PROFILE.slots.length} classes assigned</p>
+                    <p className="text-white text-sm font-medium">{currentTeacher.name}</p>
+                    <p className="text-white/40 text-xs">{currentTeacher.slots.length} classes assigned</p>
                   </div>
                 </div>
                 <button onClick={() => { setSidebarOpen(false); handleSignOut(); }}
@@ -1058,9 +1090,9 @@ export default function TeacherPortalPage() {
 
           {/* Page Header */}
           <div className="mb-6 border-b border-slate-200 pb-5">
-            <h1 className="text-2xl font-bold text-slate-800">Welcome, {TEACHER_PROFILE.name}</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Welcome, {currentTeacher.name}</h1>
             <p className="text-slate-500 text-sm mt-1">
-              {TEACHER_PROFILE.slots.length} classes · {TEACHER_PROFILE.slots.map(s => s.classId).join(", ")} ·{" "}
+              {currentTeacher.slots.length} classes · {currentTeacher.slots.map(s => s.classId).join(", ")} ·{" "}
               {new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
             </p>
           </div>
