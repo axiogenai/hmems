@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Plus, Trash2, RotateCcw, FileSpreadsheet, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Trash2, RotateCcw, FileSpreadsheet, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Student, StudentStatus } from "@/types/admin";
 import { FormInput } from "@/components/TeacherPortal/FormInput";
 
@@ -12,6 +12,7 @@ interface StudentsTabProps {
   onRestoreStudent: (id: string) => void;
   onImportCSV: (file: File) => void;
   onExportCSV: () => void;
+  isImporting?: boolean;
   formErrors: Record<string, string>;
   clearFormErrors: () => void;
 }
@@ -25,6 +26,7 @@ export function StudentsTab({
   onRestoreStudent,
   onImportCSV,
   onExportCSV,
+  isImporting = false,
   formErrors,
   clearFormErrors,
 }: StudentsTabProps) {
@@ -67,6 +69,7 @@ export function StudentsTab({
       grade: "Class I",
       rollNo: "",
       parent: "",
+      parentEmail: "",
       status: StudentStatus.Active,
     });
     setShowModal(true);
@@ -85,6 +88,7 @@ export function StudentsTab({
     if (e.target.files && e.target.files[0]) {
       onImportCSV(e.target.files[0]);
     }
+    e.target.value = "";
   };
 
   return (
@@ -117,9 +121,14 @@ export function StudentsTab({
             </button>
             {!viewArchive && (
               <>
-                <label className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all">
-                  <FileSpreadsheet size={14} /> Import CSV
-                  <input type="file" accept=".csv" onChange={handleCSVChange} className="hidden" />
+                <label className={`flex items-center gap-1.5 px-4 py-2 border text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  isImporting 
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 pointer-events-none" 
+                    : "bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700"
+                }`}>
+                  {isImporting ? <Loader2 size={14} className="animate-spin text-emerald-600" /> : <FileSpreadsheet size={14} />} 
+                  {isImporting ? "Importing CSV..." : "Import CSV"}
+                  <input type="file" accept=".csv" onChange={handleCSVChange} disabled={isImporting} className="hidden" />
                 </label>
                 <button
                   onClick={onExportCSV}

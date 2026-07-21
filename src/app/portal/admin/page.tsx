@@ -436,7 +436,10 @@ export default function AdminPortalPage() {
     await supabase.from("students").update({ deleted_at: null }).eq("id", studentId);
   };
 
+  const [isImportingStudentCSV, setIsImportingStudentCSV] = useState(false);
+
   const handleImportCSV = async (file: File) => {
+    setIsImportingStudentCSV(true);
     try {
       const text = await file.text();
       const rawRows = text.split(/\r?\n/).map(r => r.trim()).filter(r => r.length > 0);
@@ -527,6 +530,8 @@ export default function AdminPortalPage() {
     } catch (err: any) {
       console.error("CSV Import error:", err);
       setDialogAction({ type: "alert", variant: "danger", title: "Import Failed", message: "Failed to parse CSV spreadsheet file. Verify row alignment formatting." });
+    } finally {
+      setIsImportingStudentCSV(false);
     }
   };
 
@@ -936,6 +941,7 @@ export default function AdminPortalPage() {
                   onRestoreStudent={handleRestoreStudent}
                   onImportCSV={handleImportCSV}
                   onExportCSV={handleExportCSV}
+                  isImporting={isImportingStudentCSV}
                   formErrors={studentFormErrors}
                   clearFormErrors={() => setStudentFormErrors({})}
                 />
