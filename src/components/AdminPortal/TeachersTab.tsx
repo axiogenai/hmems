@@ -9,6 +9,7 @@ export function TeachersTab() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; currentName?: string } | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Modal states
@@ -116,7 +117,10 @@ export function TeachersTab() {
       const startIdx = (rawRows.length > 0 && /name|email|class|subject|phone/i.test(rawRows[0])) ? 1 : 0;
       const rows = rawRows.slice(startIdx);
 
-      for (const row of rows) {
+      setImportProgress({ current: 0, total: rows.length, currentName: "Initializing..." });
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const cols = row.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ''));
         
         // Find email column
@@ -124,9 +128,11 @@ export function TeachersTab() {
         if (emailIdx !== -1) {
           const email = cols[emailIdx];
           const name = emailIdx > 0 ? cols[0] : (cols[1] || email.split("@")[0]);
-          const phone = cols.find((c, i) => i !== emailIdx && i !== 0 && /^[\+\d\s\-()]{7,}$/.test(c)) || "";
+          const phone = cols.find((c, idx) => idx !== emailIdx && idx !== 0 && /^[\+\d\s\-()]{7,}$/.test(c)) || "";
           const assignedClass = cols[3] || "";
           const assignedSubject = cols[4] || "";
+
+          setImportProgress({ current: i + 1, total: rows.length, currentName: `Registering ${name} (${email})...` });
 
           // 1. Invite user / sync auth account
           const res = await inviteUser(email, "teacher", undefined, name, phone);
@@ -181,6 +187,7 @@ export function TeachersTab() {
       });
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -548,6 +555,44 @@ export function TeachersTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULL-SCREEN CSV IMPORT ANIMATED LOADING MODAL */}
+      {isImporting && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[99999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner">
+                <Loader2 size={36} className="animate-spin text-emerald-600" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Importing CSV Data...</h3>
+              <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 py-1.5 px-3 rounded-full inline-block border border-emerald-200/60 max-w-xs truncate">
+                {importProgress?.currentName || "Processing spreadsheet records..."}
+              </p>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                Registering faculty members, setting up class assignments, and dispatching invitation emails.
+              </p>
+            </div>
+
+            {importProgress && importProgress.total > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200 p-0.5">
+                  <div
+                    className="bg-emerald-600 h-full rounded-full transition-all duration-300 shadow-xs"
+                    style={{ width: `${Math.round((importProgress.current / importProgress.total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs font-bold text-slate-600">
+                  {importProgress.current} of {importProgress.total} records processed ({Math.round((importProgress.current / importProgress.total) * 100)}%)
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -337,6 +337,29 @@ export function StudentsTab({
           </div>
         </div>
       )}
+      {/* FULL-SCREEN CSV IMPORT ANIMATED LOADING MODAL */}
+      {isImporting && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[99999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner">
+                <Loader2 size={36} className="animate-spin text-emerald-600" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Importing Student CSV...</h3>
+              <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 py-1.5 px-3 rounded-full inline-block border border-emerald-200/60">
+                Processing student records...
+              </p>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                Parsing rows, creating student profiles, linking parents, and dispatching invitation emails.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
