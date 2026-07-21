@@ -113,16 +113,46 @@ CREATE TABLE public.payment_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 9. Create Activity Logs Table
-CREATE TABLE public.activity_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id TEXT NOT NULL,
-    text TEXT NOT NULL,
-    type TEXT NOT NULL,
-    timestamp BIGINT NOT NULL
+-- 10. Create Profiles Table (User roles mapping)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL, -- 'admin', 'teacher', 'parent'
+    linked_entity_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Set up Row Level Security (RLS) policies if needed. 
--- For a basic setup where the frontend talks directly to the DB without auth,
--- you might want to disable RLS, but it's heavily recommended to enable it in production.
--- (RLS is disabled by default for these new tables, meaning full access for Anon key).
+-- 11. Create Teachers Table
+CREATE TABLE IF NOT EXISTS public.teachers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    status TEXT DEFAULT 'Active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 12. Create Teacher Assignments Table
+CREATE TABLE IF NOT EXISTS public.teacher_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id UUID NOT NULL REFERENCES public.teachers(id) ON DELETE CASCADE,
+    class_id TEXT NOT NULL, -- e.g., 'IX-A'
+    subject TEXT NOT NULL,  -- e.g., 'Mathematics'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (teacher_id, class_id, subject)
+);
+
+-- Enable RLS & Policies
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_assignments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow full access to profiles" ON public.profiles;
+CREATE POLICY "Allow full access to profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow full access to teachers" ON public.teachers;
+CREATE POLICY "Allow full access to teachers" ON public.teachers FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow full access to teacher_assignments" ON public.teacher_assignments;
+CREATE POLICY "Allow full access to teacher_assignments" ON public.teacher_assignments FOR ALL USING (true) WITH CHECK (true);
+
