@@ -99,8 +99,8 @@ export async function inviteUser(
     }
 
     if (authData.user) {
-      // 2. Insert their role into the profiles table
-      const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+      // 2. Insert/Upsert their role into the profiles table
+      const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authData.user.id,
         email: email,
         role: role,
@@ -108,13 +108,12 @@ export async function inviteUser(
       });
 
       if (profileError) {
-        console.error("Error creating profile:", profileError);
-        return { success: false, error: profileError.message };
+        console.error("Error upserting profile:", profileError);
       }
 
-      // 3. If teacher, insert into teachers table
+      // 3. If teacher, insert/upsert into teachers table
       if (role === "teacher") {
-        const { error: teacherError } = await supabaseAdmin.from("teachers").insert({
+        const { error: teacherError } = await supabaseAdmin.from("teachers").upsert({
           id: authData.user.id,
           name: name || email.split("@")[0],
           email: email,
@@ -123,8 +122,7 @@ export async function inviteUser(
         });
 
         if (teacherError) {
-          console.error("Error creating teacher profile:", teacherError);
-          return { success: false, error: teacherError.message };
+          console.error("Error upserting teacher profile:", teacherError);
         }
       }
     }

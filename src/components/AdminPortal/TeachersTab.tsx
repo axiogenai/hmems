@@ -125,29 +125,41 @@ export function TeachersTab() {
           const email = cols[emailIdx];
           const name = emailIdx > 0 ? cols[0] : (cols[1] || email.split("@")[0]);
           const phone = cols.find((c, i) => i !== emailIdx && i !== 0 && /^[\+\d\s\-()]{7,}$/.test(c)) || "";
-          const assignedClass = cols.find((c) => /^[A-Z0-9]{1,4}(-[A-Z0-9]{1,4})?$/i.test(c) && c !== name) || cols[3] || "";
-          const assignedSubject = cols.find((c, i) => i > 2 && c !== assignedClass && c !== email && c !== phone) || cols[4] || "";
+          const assignedClass = cols[3] || "";
+          const assignedSubject = cols[4] || "";
 
+          // 1. Invite user / sync auth account
           const res = await inviteUser(email, "teacher", undefined, name, phone);
-          if (res.success) {
-            successCount++;
-            if (assignedClass && assignedSubject) {
-              const { data: teacherProfile } = await supabase
-                .from("teachers")
-                .select("id")
-                .eq("email", email)
-                .single();
 
-              if (teacherProfile?.id) {
-                // Remove any existing assignment for same class/subject to prevent duplicate
-                await supabase.from("teacher_assignments").delete().eq("teacher_id", teacherProfile.id).eq("class_id", assignedClass);
-                await supabase.from("teacher_assignments").insert({
-                  teacher_id: teacherProfile.id,
-                  class_id: assignedClass,
-                  subject: assignedSubject
-                });
-              }
+          // 2. Fetch or create teacher ID to guarantee entry in directory
+          let teacherId = res.userId;
+          if (!teacherId) {
+            const { data: existing } = await supabase.from("teachers").select("id").eq("email", email).single();
+            if (existing) {
+              teacherId = existing.id;
+            } else {
+              const newId = crypto.randomUUID();
+              await supabase.from("teachers").upsert({
+                id: newId,
+                name: name,
+                email: email,
+                phone: phone || null,
+                status: "Active"
+              });
+              teacherId = newId;
             }
+          }
+
+          successCount++;
+
+          // 3. Insert class assignment if provided
+          if (teacherId && assignedClass && assignedSubject) {
+            await supabase.from("teacher_assignments").delete().eq("teacher_id", teacherId).eq("class_id", assignedClass);
+            await supabase.from("teacher_assignments").insert({
+              teacher_id: teacherId,
+              class_id: assignedClass,
+              subject: assignedSubject
+            });
           }
         }
       }
