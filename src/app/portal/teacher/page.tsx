@@ -13,6 +13,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Grade, GradeModal } from "@/components/TeacherPortal/GradeModal";
 import { Assignment, AssignmentModal } from "@/components/TeacherPortal/AssignmentModal";
 import { ConfirmDialog } from "@/components/TeacherPortal/ConfirmDialog";
+import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 import { supabase } from "@/lib/supabase";
 import { useEffect } from "react";
 
@@ -475,6 +476,7 @@ export default function TeacherPortalPage() {
   const [announcementText, setAnnouncementText]   = useState("");
   const [announcementSuccess, setAnnouncementSuccess] = useState(false);
   const [rosterSearch, setRosterSearch]           = useState("");
+  const [toast, setToast]                         = useState<ToastMessage | null>(null);
 
   // ── Confirm dialog state ─────────────────────────────
   type ConfirmAction = { type: "deleteGrade"; id: string } | { type: "deleteAssignment"; id: number } | { type: "deleteAnnouncement"; id: string } | { type: "signOut" } | null;
@@ -631,7 +633,15 @@ export default function TeacherPortalPage() {
     e.preventDefault();
     if (!activeSlot) return;
     if (!announcementText.trim()) return;
-    if (announcementText.length > 500) { alert("Max 500 characters"); return; }
+    if (announcementText.length > 500) {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Text Too Long",
+        message: "Announcement text cannot exceed 500 characters."
+      });
+      return;
+    }
     
     const { data: insertedData } = await supabase.from("announcements").insert({
       title: escapeHtml(announcementText.trim()),
@@ -1415,6 +1425,9 @@ export default function TeacherPortalPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
+
+      {/* ── Toast Notification ── */}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

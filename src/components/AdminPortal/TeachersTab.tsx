@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { inviteUser } from "@/app/actions/auth";
+import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 
 export function TeachersTab() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,6 +79,12 @@ export function TeachersTab() {
 
       setIsSubmitting(false);
       setShowAddModal(false);
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Teacher Invited Successfully",
+        message: `Invitation email sent to ${newEmail}. Assigned ${newClassId || 'class'}`
+      });
       setNewName("");
       setNewEmail("");
       setNewPhone("");
@@ -85,7 +93,12 @@ export function TeachersTab() {
       fetchTeachers();
     } else {
       setIsSubmitting(false);
-      alert("Failed to add teacher: " + (res.error || "Unknown error"));
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Failed to Add Teacher",
+        message: res.error || "Unknown error occurred."
+      });
     }
   };
 
@@ -139,11 +152,21 @@ export function TeachersTab() {
         }
       }
 
-      alert(`Imported ${successCount} teachers successfully! Invitation emails have been sent.`);
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "CSV Import Successful",
+        message: `Registered ${successCount} teacher(s) and dispatched invitation emails.`
+      });
       fetchTeachers();
     } catch (err: any) {
       console.error("Teacher CSV Import Error:", err);
-      alert("Failed to parse teacher CSV file.");
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Import Failed",
+        message: "Failed to parse teacher CSV file. Please check file formatting."
+      });
     } finally {
       setIsImporting(false);
       e.target.value = "";
@@ -180,9 +203,20 @@ export function TeachersTab() {
     });
 
     if (error) {
-      alert("Failed to assign class: " + error.message);
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Assignment Failed",
+        message: error.message
+      });
     } else {
       setShowAssignModal(false);
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Class Assigned",
+        message: `Successfully assigned ${assignClassId} (${assignSubject}) to ${selectedTeacher.name}.`
+      });
       setAssignClassId("");
       setAssignSubject("");
       fetchTeachers();
@@ -454,6 +488,9 @@ export function TeachersTab() {
           </div>
         </div>
       )}
+
+      {/* TOAST NOTIFICATION */}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
