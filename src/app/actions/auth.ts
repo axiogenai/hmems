@@ -151,7 +151,11 @@ export async function linkOrInviteParent(email: string) {
 
     // 2. If no parent exists, we invite them
     const siteUrl = await getSiteUrl(); 
-    const redirectTo = siteUrl ? `${siteUrl}/update-password` : undefined;
+    const targetUrl = siteUrl && !siteUrl.includes("localhost") 
+      ? siteUrl 
+      : "https://holymotherenglishmediumschool.vercel.app";
+    const redirectTo = `${targetUrl}/update-password`;
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { 
       redirectTo 
     }); 
@@ -161,8 +165,8 @@ export async function linkOrInviteParent(email: string) {
     }
 
     if (authData.user) {
-      // Insert new profile
-      await supabaseAdmin.from("profiles").insert({ 
+      // Insert/Upsert new profile
+      await supabaseAdmin.from("profiles").upsert({ 
         id: authData.user.id, 
         email: email, 
         role: "parent"
@@ -173,5 +177,34 @@ export async function linkOrInviteParent(email: string) {
     return { success: false, error: "Failed to create parent profile" };
   } catch (err: any) {
     return { success: false, error: err.message || "Unknown error" };
+  }
+}
+
+export async function resendPasswordLink(email: string) {
+  try {
+    const siteUrl = await getSiteUrl();
+    const targetUrl = siteUrl && !siteUrl.includes("localhost") 
+      ? siteUrl 
+      : "https://holymotherenglishmediumschool.vercel.app";
+    const redirectTo = `${targetUrl}/update-password`;
+
+    // Try invite first, fallback to reset password link
+    const { error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      redirectTo
+    });
+
+    if (inviteErr) {
+      console.log("inviteUser error, trying resetPasswordForEmail fallback:", inviteErr.message);
+      const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo
+      });
+      if (resetErr) {
+        return { success: false, error: resetErr.message };
+      }
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to resend password setup link." };
   }
 }

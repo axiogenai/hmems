@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2 } from "lucide-react";
+import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { inviteUser } from "@/app/actions/auth";
+import { inviteUser, resendPasswordLink } from "@/app/actions/auth";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 
 export function TeachersTab() {
@@ -28,6 +28,28 @@ export function TeachersTab() {
   // Assign Class Form
   const [assignClassId, setAssignClassId] = useState("");
   const [assignSubject, setAssignSubject] = useState("");
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+
+  const handleResendLink = async (email: string) => {
+    setResendingEmail(email);
+    const res = await resendPasswordLink(email);
+    setResendingEmail(null);
+    if (res.success) {
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Password Setup Link Resent",
+        message: `Fresh password setup link emailed to ${email}. Redirects directly to production site.`
+      });
+    } else {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Failed to Resend Link",
+        message: res.error || "Unable to dispatch invitation email."
+      });
+    }
+  };
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -361,16 +383,31 @@ export function TeachersTab() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => {
-                        setSelectedTeacher(t);
-                        setShowAssignModal(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-bold text-xs bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-                    >
-                      <Plus size={12} />
-                      {t.assignments?.length > 0 ? "Add Class" : "Assign Class"}
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleResendLink(t.email)}
+                        disabled={resendingEmail === t.email}
+                        title="Resend Password Setup Email to Teacher"
+                        className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-bold text-xs bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        {resendingEmail === t.email ? (
+                          <Loader2 size={12} className="animate-spin text-emerald-600" />
+                        ) : (
+                          <Mail size={12} className="text-emerald-600" />
+                        )}
+                        {resendingEmail === t.email ? "Sending..." : "Resend Link"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedTeacher(t);
+                          setShowAssignModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-bold text-xs bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plus size={12} />
+                        {t.assignments?.length > 0 ? "Add Class" : "Assign Class"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
