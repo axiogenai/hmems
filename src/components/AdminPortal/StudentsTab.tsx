@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Search, Plus, Trash2, RotateCcw, FileSpreadsheet, Download, ChevronLeft, ChevronRight, Loader2, Mail } from "lucide-react";
 import { Student, StudentStatus } from "@/types/admin";
 import { FormInput } from "@/components/TeacherPortal/FormInput";
-import { resendPasswordLink } from "@/app/actions/auth";
+import { resendPasswordLink, purgeAllStudents } from "@/app/actions/auth";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 
 interface StudentsTabProps {
@@ -35,9 +35,37 @@ export function StudentsTab({
   const [showModal, setShowModal] = useState(false);
   const [viewArchive, setViewArchive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
+  const [isPurgingStudents, setIsPurgingStudents] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const itemsPerPage = 8;
+
+  const handlePurgeStudents = async () => {
+    setIsPurgingStudents(true);
+    const res = await purgeAllStudents();
+    setIsPurgingStudents(false);
+    setShowPurgeConfirmModal(false);
+
+    if (res.success) {
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Student Database Purged",
+        message: "All student and parent records have been deleted."
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Purge Failed",
+        message: res.error || "Failed to purge student records."
+      });
+    }
+  };
 
   const handleResendParentLink = async (email: string) => {
     setResendingEmail(email);
@@ -160,6 +188,12 @@ export function StudentsTab({
                   className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all"
                 >
                   <Download size={14} /> Export CSV
+                </button>
+                <button
+                  onClick={() => setShowPurgeConfirmModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm"
+                >
+                  <Trash2 size={14} /> Purge Database
                 </button>
                 <button
                   onClick={handleOpenModal}
@@ -407,6 +441,46 @@ export function StudentsTab({
           </div>
         </div>
       )}
+      {/* CONFIRM PURGE STUDENTS MODAL */}
+      {showPurgeConfirmModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Purge Student & Parent Database</h3>
+                <p className="text-xs text-rose-600 font-semibold">Irreversible Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              Are you sure you want to <strong>delete ALL students, parent links, grades, attendance, and fee records</strong> from the database? This action will empty the student directory completely in one click.
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPurgeConfirmModal(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingStudents}
+                onClick={handlePurgeStudents}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/25 cursor-pointer flex items-center gap-2 disabled:opacity-60"
+              >
+                {isPurgingStudents ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {isPurgingStudents ? "Purging..." : "Yes, Empty Student Database"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOAST NOTIFICATION */}
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </div>

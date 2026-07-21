@@ -444,92 +444,117 @@ export default function AdminPortalPage() {
       const text = await file.text();
       const rawRows = text.split(/\r?\n/).map(r => r.trim()).filter(r => r.length > 0);
       const imported: Student[] = [];
-      const dbRows: any[] = [];
+      let successCount = 0;
+      let skippedCount = 0;
       let invitedCount = 0;
 
       const startIdx = (rawRows.length > 0 && /roll|student|name|grade|parent/i.test(rawRows[0])) ? 1 : 0;
       const rows = rawRows.slice(startIdx);
 
+      // Existing student map for fast duplicate detection
+      const existingMap = new Set(students.map(s => `${s.grade.toLowerCase().trim()}_${s.rollNo.toLowerCase().trim()}`));
+
       for (const row of rows) {
-        const cols = row.split(",").map(c => c.trim().replace(/^["']|["']$/g, ''));
-        if (cols.length >= 4 && cols[0]) {
-          let rollNo = cols[0];
-          let name = cols[1];
-          let grade = cols[2];
-          let section = "";
-          let parentName = "";
-          let parentEmail = "";
-          let phone = "";
+        try {
+          const cols = row.split(",").map(c => c.trim().replace(/^["']|["']$/g, ''));
+          if (cols.length >= 4 && cols[0]) {
+            let rollNo = cols[0];
+            let name = cols[1];
+            let grade = cols[2];
+            let section = "";
+            let parentName = "";
+            let parentEmail = "";
+            let phone = "";
 
-          if (cols.length >= 6) {
-            section = cols[3];
-            parentName = cols[4];
-            parentEmail = cols[5];
-            phone = cols[6] || "";
-          } else if (cols.length === 5) {
-            parentName = cols[3];
-            parentEmail = cols[4];
-          } else {
-            parentName = cols[3];
-          }
-
-          let parentId = "";
-          if (parentEmail && /^\S+@\S+\.\S+$/.test(parentEmail)) {
-            const linkRes = await linkOrInviteParent(parentEmail);
-            if (linkRes.success && linkRes.parentId) {
-              parentId = linkRes.parentId;
-              invitedCount++;
+            if (cols.length >= 6) {
+              section = cols[3];
+              parentName = cols[4];
+              parentEmail = cols[5];
+              phone = cols[6] || "";
+            } else if (cols.length === 5) {
+              parentName = cols[3];
+              parentEmail = cols[4];
+            } else {
+              parentName = cols[3];
             }
+
+            // DUPLICATE CHECK: If student with same grade + rollNo already exists, skip duplicate & continue!
+            const dupeKey = `${grade.toLowerCase().trim()}_${rollNo.toLowerCase().trim()}`;
+            if (existingMap.has(dupeKey)) {
+              skippedCount++;
+              continue;
+            }
+
+            let parentId = "";
+            if (parentEmail && /^\S+@\S+\.\S+$/.test(parentEmail)) {
+              const linkRes = await linkOrInviteParent(parentEmail);
+              if (linkRes.success && linkRes.parentId) {
+                parentId = linkRes.parentId;
+                invitedCount++;
+              }
+            }
+
+            const sId = crypto.randomUUID();
+            const studentObj: Student = {
+              id: sId,
+              rollNo,
+              name,
+              grade,
+              parent: parentName,
+              parentEmail: parentEmail || undefined,
+              parentId: parentId || undefined,
+              status: StudentStatus.Active,
+              enrollmentDate: new Date().toISOString().split("T")[0]
+            };
+
+            const dbRow = {
+              id: sId,
+              roll_no: rollNo,
+              name: name,
+              grade: grade,
+              section: section || null,
+              parent: parentName,
+              parent_id: parentId || null,
+              email: parentEmail || null,
+              phone: phone || null,
+              status: StudentStatus.Active,
+              enrollment_date: new Date().toISOString().split("T")[0]
+            };
+
+            // Single row insert with error handling
+            const { error: insErr } = await supabase.from("students").insert(dbRow);
+            if (insErr) {
+              console.warn("Row insert failed, skipping duplicate/error:", insErr.message);
+              skippedCount++;
+              continue;
+            }
+
+            imported.push(studentObj);
+            existingMap.add(dupeKey);
+            successCount++;
           }
-
-          const sId = crypto.randomUUID();
-          imported.push({
-            id: sId,
-            rollNo,
-            name,
-            grade,
-            parent: parentName,
-            parentEmail: parentEmail || undefined,
-            parentId: parentId || undefined,
-            status: StudentStatus.Active,
-            enrollmentDate: new Date().toISOString().split("T")[0]
-          });
-
-          dbRows.push({
-            id: sId,
-            roll_no: rollNo,
-            name: name,
-            grade: grade,
-            section: section || null,
-            parent: parentName,
-            parent_id: parentId || null,
-            email: parentEmail || null,
-            phone: phone || null,
-            status: StudentStatus.Active,
-            enrollment_date: new Date().toISOString().split("T")[0]
-          });
+        } catch (rowErr) {
+          console.warn("Error processing CSV row, skipping:", rowErr);
+          skippedCount++;
         }
       }
 
-      if (imported.length === 0) {
+      if (successCount === 0 && skippedCount === 0) {
         setDialogAction({ type: "alert", variant: "warning", title: "Import Failed", message: "No valid rows discovered in CSV sheet file." });
         return;
       }
 
-      // Batch insert into database
-      await supabase.from("students").insert(dbRows);
-
       setStudents(prev => [...prev, ...imported]);
-      logActivity(`Bulk imported ${imported.length} student records via CSV`, "success");
+      logActivity(`Bulk imported ${successCount} student records via CSV`, "success");
       setDialogAction({ 
         type: "alert", 
         variant: "success", 
-        title: "Import Successful", 
-        message: `Imported ${imported.length} students successfully! ${invitedCount > 0 ? `Sent ${invitedCount} parent invitation emails with password setup links.` : ''}` 
+        title: "CSV Import Complete", 
+        message: `Successfully imported ${successCount} student(s)! ${skippedCount > 0 ? `${skippedCount} duplicate/invalid record(s) were ignored.` : ''} ${invitedCount > 0 ? `Sent ${invitedCount} parent invitation email(s).` : ''}` 
       });
     } catch (err: any) {
       console.error("CSV Import error:", err);
-      setDialogAction({ type: "alert", variant: "danger", title: "Import Failed", message: "Failed to parse CSV spreadsheet file. Verify row alignment formatting." });
+      setDialogAction({ type: "alert", variant: "danger", title: "Import Failed", message: "Failed to parse CSV spreadsheet file. Verify row formatting." });
     } finally {
       setIsImportingStudentCSV(false);
     }

@@ -208,3 +208,27 @@ export async function resendPasswordLink(email: string) {
     return { success: false, error: err.message || "Failed to resend password setup link." };
   }
 }
+
+export async function purgeAllTeachers() {
+  try {
+    await supabaseAdmin.from("teacher_assignments").delete().not("id", "is", null);
+    await supabaseAdmin.from("teachers").delete().not("id", "is", null);
+    await supabaseAdmin.from("profiles").delete().eq("role", "teacher");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to purge teachers." };
+  }
+}
+
+export async function purgeAllStudents() {
+  try {
+    await supabaseAdmin.from("grades").delete().not("id", "is", null);
+    await supabaseAdmin.from("attendance").delete().not("id", "is", null);
+    await supabaseAdmin.from("fees").delete().not("id", "is", null);
+    await supabaseAdmin.from("students").delete().not("id", "is", null);
+    await supabaseAdmin.from("profiles").delete().eq("role", "parent");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to purge students." };
+  }
+}

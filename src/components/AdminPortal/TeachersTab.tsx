@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2, Mail } from "lucide-react";
+import { Plus, Search, Check, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2, Mail, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { inviteUser, resendPasswordLink } from "@/app/actions/auth";
+import { inviteUser, resendPasswordLink, purgeAllTeachers } from "@/app/actions/auth";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 
 export function TeachersTab() {
@@ -11,6 +11,32 @@ export function TeachersTab() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; currentName?: string } | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
+  const [isPurgingTeachers, setIsPurgingTeachers] = useState(false);
+
+  const handlePurgeTeachers = async () => {
+    setIsPurgingTeachers(true);
+    const res = await purgeAllTeachers();
+    setIsPurgingTeachers(false);
+    setShowPurgeConfirmModal(false);
+
+    if (res.success) {
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Teacher Database Purged",
+        message: "All teacher profiles and class assignments have been deleted."
+      });
+      fetchTeachers();
+    } else {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Purge Failed",
+        message: res.error || "Failed to purge teachers."
+      });
+    }
+  };
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -134,6 +160,7 @@ export function TeachersTab() {
       const text = await file.text();
       const rawRows = text.split(/\r?\n/).map((r) => r.trim()).filter((r) => r.length > 0);
       let successCount = 0;
+      let skippedCount = 0;
 
       // Check if first row is header
       const startIdx = (rawRows.length > 0 && /name|email|class|subject|phone/i.test(rawRows[0])) ? 1 : 0;
@@ -142,19 +169,31 @@ export function TeachersTab() {
       setImportProgress({ current: 0, total: rows.length, currentName: "Initializing..." });
 
       for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const cols = row.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ''));
-        
-        // Find email column
-        const emailIdx = cols.findIndex((c) => /^\S+@\S+\.\S+$/.test(c));
-        if (emailIdx !== -1) {
-          const email = cols[emailIdx];
+        try {
+          const row = rows[i];
+          const cols = row.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ''));
+          
+          // Find email column
+          const emailIdx = cols.findIndex((c) => /^\S+@\S+\.\S+$/.test(c));
+          if (emailIdx === -1) {
+            skippedCount++;
+            continue;
+          }
+
+          const email = cols[emailIdx].toLowerCase();
           const name = emailIdx > 0 ? cols[0] : (cols[1] || email.split("@")[0]);
           const phone = cols.find((c, idx) => idx !== emailIdx && idx !== 0 && /^[\+\d\s\-()]{7,}$/.test(c)) || "";
           const assignedClass = cols[3] || "";
           const assignedSubject = cols[4] || "";
 
-          setImportProgress({ current: i + 1, total: rows.length, currentName: `Registering ${name} (${email})...` });
+          setImportProgress({ current: i + 1, total: rows.length, currentName: `Processing ${name} (${email})...` });
+
+          // DUPLICATE CHECK: If teacher email already exists, skip duplicate & continue!
+          const { data: existingTeacher } = await supabase.from("teachers").select("id").eq("email", email).single();
+          if (existingTeacher) {
+            skippedCount++;
+            continue;
+          }
 
           // 1. Invite user / sync auth account
           const res = await inviteUser(email, "teacher", undefined, name, phone);
@@ -162,20 +201,15 @@ export function TeachersTab() {
           // 2. Fetch or create teacher ID to guarantee entry in directory
           let teacherId = res.userId;
           if (!teacherId) {
-            const { data: existing } = await supabase.from("teachers").select("id").eq("email", email).single();
-            if (existing) {
-              teacherId = existing.id;
-            } else {
-              const newId = crypto.randomUUID();
-              await supabase.from("teachers").upsert({
-                id: newId,
-                name: name,
-                email: email,
-                phone: phone || null,
-                status: "Active"
-              });
-              teacherId = newId;
-            }
+            const newId = crypto.randomUUID();
+            await supabase.from("teachers").upsert({
+              id: newId,
+              name: name,
+              email: email,
+              phone: phone || null,
+              status: "Active"
+            });
+            teacherId = newId;
           }
 
           successCount++;
@@ -189,14 +223,17 @@ export function TeachersTab() {
               subject: assignedSubject
             });
           }
+        } catch (rowErr) {
+          console.warn("Error processing row, skipping:", rowErr);
+          skippedCount++;
         }
       }
 
       setToast({
         id: Date.now().toString(),
         type: "success",
-        title: "CSV Import Successful",
-        message: `Registered ${successCount} teacher(s) and dispatched invitation emails.`
+        title: "CSV Import Complete",
+        message: `Registered ${successCount} new teacher(s). ${skippedCount > 0 ? `${skippedCount} duplicate/invalid record(s) skipped.` : ''}`
       });
       fetchTeachers();
     } catch (err: any) {
@@ -301,6 +338,12 @@ export function TeachersTab() {
             className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm"
           >
             <Download size={14} /> Export CSV
+          </button>
+          <button
+            onClick={() => setShowPurgeConfirmModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm"
+          >
+            <Trash2 size={14} /> Purge Database
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -630,6 +673,46 @@ export function TeachersTab() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM PURGE TEACHERS MODAL */}
+      {showPurgeConfirmModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Purge Teacher Database</h3>
+                <p className="text-xs text-rose-600 font-semibold">Irreversible Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              Are you sure you want to <strong>delete ALL teachers and class assignments</strong> from the database? This will empty the teacher directory completely in one click.
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPurgeConfirmModal(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingTeachers}
+                onClick={handlePurgeTeachers}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/25 cursor-pointer flex items-center gap-2 disabled:opacity-60"
+              >
+                {isPurgingTeachers ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {isPurgingTeachers ? "Purging..." : "Yes, Empty Teacher Database"}
+              </button>
+            </div>
           </div>
         </div>
       )}
