@@ -64,9 +64,9 @@ export function ToastNotification({ toast, onClose, duration = 4000 }: ToastNoti
             </div>
 
             <div className="flex-1 min-w-0 pr-2">
-              <h4 className="text-sm font-bold tracking-tight">{toast.title}</h4>
+              <h4 className="text-sm font-bold tracking-tight text-white">{toast.title}</h4>
               {toast.message && (
-                <p className="text-xs opacity-80 mt-0.5 leading-relaxed font-normal">{toast.message}</p>
+                <p className="text-xs text-emerald-100/90 mt-1 leading-relaxed font-medium">{toast.message}</p>
               )}
             </div>
 

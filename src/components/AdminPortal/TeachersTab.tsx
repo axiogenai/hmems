@@ -192,6 +192,19 @@ export function TeachersTab() {
     document.body.removeChild(link);
   };
 
+  const handleRemoveAssignment = async (assignmentId: string) => {
+    const { error } = await supabase.from("teacher_assignments").delete().eq("id", assignmentId);
+    if (!error) {
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Assignment Removed",
+        message: "Successfully unlinked class assignment."
+      });
+      fetchTeachers();
+    }
+  };
+
   const handleAssignClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeacher) return;
@@ -311,9 +324,16 @@ export function TeachersTab() {
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
                       {t.assignments?.map((a: any) => (
-                        <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">
-                          <BookOpen size={10} />
-                          {a.class_id} - {a.subject}
+                        <span key={a.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 group">
+                          <BookOpen size={12} className="text-emerald-600" />
+                          <span>{a.class_id} — {a.subject}</span>
+                          <button
+                            onClick={() => handleRemoveAssignment(a.id)}
+                            title="Remove Class Assignment"
+                            className="ml-1 p-0.5 rounded text-emerald-600 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <X size={12} />
+                          </button>
                         </span>
                       ))}
                       {t.assignments?.length === 0 && (
@@ -327,9 +347,10 @@ export function TeachersTab() {
                         setSelectedTeacher(t);
                         setShowAssignModal(true);
                       }}
-                      className="text-primary hover:text-accent font-medium text-xs bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-bold text-xs bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
                     >
-                      Assign Class
+                      <Plus size={12} />
+                      {t.assignments?.length > 0 ? "Add Class" : "Assign Class"}
                     </button>
                   </td>
                 </tr>
