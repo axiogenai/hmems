@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, CheckSquare, BookOpen, FileText, Bell, LogOut,
   BarChart3, Search, Plus, Check, X, GraduationCap, Eye, EyeOff, Menu,
-  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers, Loader2
+  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers, Loader2, Send
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -15,6 +15,7 @@ import { Assignment, AssignmentModal } from "@/components/TeacherPortal/Assignme
 import { ConfirmDialog } from "@/components/TeacherPortal/ConfirmDialog";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 import { supabase } from "@/lib/supabase";
+import { resendPasswordLink } from "@/app/actions/auth";
 import { useEffect } from "react";
 
 // ─── Data Model ───────────────────────────────────────────────────────────────
@@ -478,6 +479,30 @@ export default function TeacherPortalPage() {
   const [rosterSearch, setRosterSearch]           = useState("");
   const [toast, setToast]                         = useState<ToastMessage | null>(null);
 
+  // Forgot Password State
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [isSendingForgotLink, setIsSendingForgotLink] = useState(false);
+  const [forgotSuccessMsg, setForgotSuccessMsg] = useState("");
+  const [forgotErrorMsg, setForgotErrorMsg] = useState("");
+
+  const handleSendForgotLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setIsSendingForgotLink(true);
+    setForgotSuccessMsg("");
+    setForgotErrorMsg("");
+
+    const res = await resendPasswordLink(forgotEmail);
+    setIsSendingForgotLink(false);
+
+    if (res.success) {
+      setForgotSuccessMsg(`Password setup email dispatched to ${forgotEmail}! Please check your email inbox to set up your password.`);
+    } else {
+      setForgotErrorMsg(res.error || "Unable to send password setup email.");
+    }
+  };
+
   // ── Confirm dialog state ─────────────────────────────
   type ConfirmAction = { type: "deleteGrade"; id: string } | { type: "deleteAssignment"; id: number } | { type: "deleteAnnouncement"; id: string } | { type: "signOut" } | null;
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
@@ -757,7 +782,19 @@ export default function TeacherPortalPage() {
                     className="w-full px-4 py-3 rounded-xl border border-border text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 transition-all placeholder-slate-400 font-medium" required />
                 </div>
                 <div>
-                  <label htmlFor="loginPassword" className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">Password</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="loginPassword" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(loginEmail);
+                        setShowForgotModal(true);
+                      }}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      Forgot / Set Password?
+                    </button>
+                  </div>
                   <div className="relative">
                     <input id="loginPassword" type={showPassword ? "text" : "password"} placeholder="••••••••"
                       value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
@@ -781,10 +818,68 @@ export default function TeacherPortalPage() {
                   )}
                 </button>
               </form>
-              <p className="text-center text-xs text-slate-400 mt-6 leading-relaxed font-medium">Demo mode — click login to explore the dashboard</p>
+              <p className="text-center text-xs text-slate-400 mt-6 leading-relaxed font-medium">Faculty portal — enter registered email & password</p>
             </div>
           </div>
         </motion.div>
+
+        {/* FORGOT / SET PASSWORD MODAL */}
+        {showForgotModal && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[999] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-200 p-8 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Set / Reset Password</h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">Receive a password link pointing to the live site</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotModal(false); setForgotSuccessMsg(""); setForgotErrorMsg(""); }}
+                  className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {forgotSuccessMsg && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-2xl leading-relaxed">
+                  {forgotSuccessMsg}
+                </div>
+              )}
+
+              {forgotErrorMsg && (
+                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl leading-relaxed">
+                  {forgotErrorMsg}
+                </div>
+              )}
+
+              {!forgotSuccessMsg && (
+                <form onSubmit={handleSendForgotLink} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Registered Teacher Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="teacher@school.com"
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSendingForgotLink}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {isSendingForgotLink ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} />}
+                    {isSendingForgotLink ? "Sending Email Link..." : "Send Password Setup Link"}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

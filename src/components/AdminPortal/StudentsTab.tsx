@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { Search, Plus, Trash2, RotateCcw, FileSpreadsheet, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, Plus, Trash2, RotateCcw, FileSpreadsheet, Download, ChevronLeft, ChevronRight, Loader2, Mail } from "lucide-react";
 import { Student, StudentStatus } from "@/types/admin";
 import { FormInput } from "@/components/TeacherPortal/FormInput";
+import { resendPasswordLink } from "@/app/actions/auth";
+import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 
 interface StudentsTabProps {
   students: Student[];
@@ -33,7 +35,30 @@ export function StudentsTab({
   const [showModal, setShowModal] = useState(false);
   const [viewArchive, setViewArchive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const itemsPerPage = 8;
+
+  const handleResendParentLink = async (email: string) => {
+    setResendingEmail(email);
+    const res = await resendPasswordLink(email);
+    setResendingEmail(null);
+    if (res.success) {
+      setToast({
+        id: Date.now().toString(),
+        type: "success",
+        title: "Parent Setup Link Resent",
+        message: `Fresh password setup link emailed to parent (${email}).`
+      });
+    } else {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Failed to Resend Link",
+        message: res.error || "Unable to dispatch invitation email."
+      });
+    }
+  };
 
   // New Student State
   const [newStudent, setNewStudent] = useState<Omit<Student, "id" | "enrollmentDate">>({
@@ -189,7 +214,12 @@ export function StudentsTab({
                       </td>
                       <td className="px-4 py-3.5 font-bold text-slate-700">{s.name}</td>
                       <td className="px-4 py-3.5 text-xs text-slate-600 font-semibold">{s.grade}</td>
-                      <td className="px-4 py-3.5 text-xs text-slate-500">{s.parent}</td>
+                      <td className="px-4 py-3.5 text-xs text-slate-700 font-medium">
+                        <div>{s.parent}</div>
+                        {s.parentEmail && (
+                          <div className="text-[11px] text-slate-400 font-mono font-normal mt-0.5">{s.parentEmail}</div>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 text-center">
                         <span
                           className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg ${
@@ -204,21 +234,38 @@ export function StudentsTab({
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        {viewArchive ? (
-                          <button
-                            onClick={() => onRestoreStudent(s.id)}
-                            className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 justify-end ml-auto cursor-pointer"
-                          >
-                            <RotateCcw size={12} /> Restore
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => onDeleteStudent(s.id)}
-                            className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1 justify-end ml-auto cursor-pointer"
-                          >
-                            <Trash2 size={12} /> Archive
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {!viewArchive && s.parentEmail && (
+                            <button
+                              onClick={() => handleResendParentLink(s.parentEmail!)}
+                              disabled={resendingEmail === s.parentEmail}
+                              title="Resend Password Setup Email to Parent"
+                              className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-bold text-xs bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 px-2.5 py-1 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                            >
+                              {resendingEmail === s.parentEmail ? (
+                                <Loader2 size={12} className="animate-spin text-emerald-600" />
+                              ) : (
+                                <Mail size={12} className="text-emerald-600" />
+                              )}
+                              {resendingEmail === s.parentEmail ? "Sending..." : "Resend Link"}
+                            </button>
+                          )}
+                          {viewArchive ? (
+                            <button
+                              onClick={() => onRestoreStudent(s.id)}
+                              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 justify-end cursor-pointer"
+                            >
+                              <RotateCcw size={12} /> Restore
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onDeleteStudent(s.id)}
+                              className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1 justify-end cursor-pointer"
+                            >
+                              <Trash2 size={12} /> Archive
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -360,6 +407,8 @@ export function StudentsTab({
           </div>
         </div>
       )}
+      {/* TOAST NOTIFICATION */}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
