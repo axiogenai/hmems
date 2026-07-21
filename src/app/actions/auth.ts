@@ -48,6 +48,34 @@ export async function inviteUser(
 
     if (authError) {
       console.error("Error inviting user:", authError);
+      // If user already exists in Auth, check and ensure profile & teacher record exist
+      const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, role")
+        .eq("email", email)
+        .single();
+
+      if (existingProfile && existingProfile.id) {
+        if (role === "teacher") {
+          const { data: existingTeacher } = await supabaseAdmin
+            .from("teachers")
+            .select("id")
+            .eq("id", existingProfile.id)
+            .single();
+
+          if (!existingTeacher) {
+            await supabaseAdmin.from("teachers").insert({
+              id: existingProfile.id,
+              name: name || email.split("@")[0],
+              email: email,
+              phone: phone || null,
+              status: "Active"
+            });
+          }
+        }
+        return { success: true, alreadyExisted: true, userId: existingProfile.id };
+      }
+
       return { success: false, error: authError.message };
     }
 

@@ -96,23 +96,29 @@ export function TeachersTab() {
 
     try {
       const text = await file.text();
-      const rows = text.split("\n").map((r) => r.trim()).filter((r) => r.length > 0).slice(1);
+      const rawRows = text.split(/\r?\n/).map((r) => r.trim()).filter((r) => r.length > 0);
       let successCount = 0;
+
+      // Check if first row is header
+      const startIdx = (rawRows.length > 0 && /name|email|class|subject|phone/i.test(rawRows[0])) ? 1 : 0;
+      const rows = rawRows.slice(startIdx);
 
       for (const row of rows) {
         const cols = row.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ''));
-        if (cols.length >= 2 && cols[1]) {
-          const name = cols[0];
-          const email = cols[1];
-          const phone = cols[2] || "";
-          const assignedClass = cols[3] || "";
-          const assignedSubject = cols[4] || "";
+        
+        // Find email column
+        const emailIdx = cols.findIndex((c) => /^\S+@\S+\.\S+$/.test(c));
+        if (emailIdx !== -1) {
+          const email = cols[emailIdx];
+          const name = emailIdx > 0 ? cols[0] : (cols[1] || email.split("@")[0]);
+          const phone = cols.find((c, i) => i !== emailIdx && i !== 0 && /^[\+\d\s\-()]{7,}$/.test(c)) || "";
+          const assignedClass = cols.find((c) => /^[A-Z0-9]{1,4}(-[A-Z0-9]{1,4})?$/i.test(c) && c !== name) || cols[3] || "";
+          const assignedSubject = cols.find((c, i) => i > 2 && c !== assignedClass && c !== email && c !== phone) || cols[4] || "";
 
           const res = await inviteUser(email, "teacher", undefined, name, phone);
           if (res.success) {
             successCount++;
             if (assignedClass && assignedSubject) {
-              // Fetch newly created teacher ID
               const { data: teacherProfile } = await supabase
                 .from("teachers")
                 .select("id")
@@ -120,6 +126,8 @@ export function TeachersTab() {
                 .single();
 
               if (teacherProfile?.id) {
+                // Remove any existing assignment for same class/subject to prevent duplicate
+                await supabase.from("teacher_assignments").delete().eq("teacher_id", teacherProfile.id).eq("class_id", assignedClass);
                 await supabase.from("teacher_assignments").insert({
                   teacher_id: teacherProfile.id,
                   class_id: assignedClass,
