@@ -44,7 +44,11 @@ export async function inviteUser(
     // 1. Invite the user via Supabase Auth Admin API
     // This sends them an email with a link to set their password.
     const siteUrl = await getSiteUrl();
-    const redirectTo = siteUrl ? `${siteUrl}/update-password` : undefined;
+    const targetUrl = siteUrl && !siteUrl.includes("localhost") 
+      ? siteUrl 
+      : "https://holymotherenglishmediumschool.vercel.app";
+    const redirectTo = `${targetUrl}/update-password`;
+    
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo
     });
