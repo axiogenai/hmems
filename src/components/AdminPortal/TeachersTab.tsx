@@ -216,6 +216,18 @@ function matchClassId(c1: string, c2: string): boolean {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const isEmailDuplicate = teachers.some(t => t.email?.toLowerCase().trim() === newEmail.toLowerCase().trim());
+    if (isEmailDuplicate) {
+      setToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Registration Failed",
+        message: "A teacher with this email address is already registered!"
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
     const res = await inviteUser(newEmail, "teacher", undefined, newName, newPhone);
 
     if (res.success) {

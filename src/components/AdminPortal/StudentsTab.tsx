@@ -90,6 +90,7 @@ export function StudentsTab({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("ALL");
   const [showClassGridModal, setShowClassGridModal] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const itemsPerPage = 8;
 
   const classCounts = useMemo(() => {
@@ -222,17 +223,23 @@ export function StudentsTab({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await onAddStudent(newStudent);
-    if (success) {
-      setShowModal(false);
-      setNewStudent({
-        name: "",
-        grade: activeClassWindow || (selectedClassFilter !== "ALL" ? selectedClassFilter : "Class I-A"),
-        rollNo: "",
-        parent: "",
-        parentEmail: "",
-        status: StudentStatus.Active
-      });
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const success = await onAddStudent(newStudent);
+      if (success) {
+        setShowModal(false);
+        setNewStudent({
+          name: "",
+          grade: activeClassWindow || (selectedClassFilter !== "ALL" ? selectedClassFilter : "Class I-A"),
+          rollNo: "",
+          parent: "",
+          parentEmail: "",
+          status: StudentStatus.Active
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -801,9 +808,17 @@ export function StudentsTab({
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-primary hover:bg-primary-light text-white font-bold rounded-xl text-xs shadow-md transition-all mt-4 cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full py-2.5 bg-primary hover:bg-primary-light text-white font-bold rounded-xl text-xs shadow-md transition-all mt-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Register Student in {newStudent.grade}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-white" />
+                    Registering Student...
+                  </>
+                ) : (
+                  `Register Student in ${newStudent.grade}`
+                )}
               </button>
             </form>
           </div>

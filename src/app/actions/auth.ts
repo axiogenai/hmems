@@ -374,3 +374,165 @@ export async function sendBulkWhatsAppBroadcast(targetGroup: "all" | "parents" |
     return { success: false, error: err.message };
   }
 }
+
+export async function fetchTeacherPortalData(email: string) {
+  try {
+    if (!email) return { success: false, error: "Email is required" };
+
+    // 1. Fetch Teacher record
+    const { data: teacherRecord } = await supabaseAdmin
+      .from('teachers')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+
+    if (!teacherRecord) {
+      return { success: true, teacherRecord: null, assignments: [], rosters: {}, gradesData: [], assignmentsData: [], attendanceData: [], announcementsData: [] };
+    }
+
+    // 2. Fetch Assignments
+    const { data: assignments } = await supabaseAdmin
+      .from('teacher_assignments')
+      .select('*')
+      .eq('teacher_id', teacherRecord.id);
+
+    const activeAssignments = assignments || [];
+    const teacherSlots = activeAssignments.map((a: any) => ({ classId: a.class_id, subject: a.subject }));
+    const classIds = [...new Set(teacherSlots.map((s: any) => s.classId))];
+
+    // 3. Fetch Students for assigned classes
+    const rosters: Record<string, any[]> = {};
+    for (const classId of classIds) {
+      const cleanClass = classId.replace(/^Class\s+/i, "").trim();
+      const possibleGrades = [cleanClass, `Class ${cleanClass}`, `Class  ${cleanClass}`];
+
+      const { data: students } = await supabaseAdmin
+        .from('students')
+        .select('*')
+        .in('grade', possibleGrades)
+        .is('deleted_at', null);
+
+      if (students) {
+        rosters[classId] = students.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          rollNo: s.roll_no,
+          phone: s.phone || '',
+          email: s.email || ''
+        }));
+      } else {
+        rosters[classId] = [];
+      }
+    }
+
+    // 4. Fetch grades, assignments, attendance, announcements
+    const [
+      { data: gradesData },
+      { data: assignmentsData },
+      { data: attendanceData },
+      { data: announcementsData }
+    ] = await Promise.all([
+      classIds.length > 0 ? supabaseAdmin.from("grades").select("*").in("class_id", classIds) : Promise.resolve({ data: [] }),
+      classIds.length > 0 ? supabaseAdmin.from("assignments").select("*").in("class_id", classIds) : Promise.resolve({ data: [] }),
+      classIds.length > 0 ? supabaseAdmin.from("attendance").select("*").in("class_id", classIds) : Promise.resolve({ data: [] }),
+      classIds.length > 0 ? supabaseAdmin.from("announcements").select("*").in("class_id", classIds) : Promise.resolve({ data: [] })
+    ]);
+
+    return {
+      success: true,
+      teacherRecord,
+      assignments: activeAssignments,
+      rosters,
+      gradesData: gradesData || [],
+      assignmentsData: assignmentsData || [],
+      attendanceData: attendanceData || [],
+      announcementsData: announcementsData || []
+    };
+  } catch (err: any) {
+    console.error("fetchTeacherPortalData error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function fetchParentPortalData(email: string) {
+  try {
+    if (!email) return { success: false, error: "Email is required" };
+
+    const { data: kidsData } = await supabaseAdmin
+      .from("students")
+      .select("*")
+      .eq("email", email.toLowerCase().trim())
+      .is("deleted_at", null);
+
+    if (!kidsData || kidsData.length === 0) {
+      // Also check by parent_id or profiles
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("email", email.toLowerCase().trim())
+        .maybeSingle();
+
+      let kids: any[] = [];
+      if (profile) {
+        const { data: kidsByParentId } = await supabaseAdmin
+          .from("students")
+          .select("*")
+          .eq("parent_id", profile.id)
+          .is("deleted_at", null);
+
+        if (kidsByParentId) kids = kidsByParentId;
+      }
+
+      if (kids.length === 0) {
+        return { success: true, kidsData: [], gradesData: [], attendanceData: [], feesData: [], noticesData: [] };
+      }
+      
+      const studentIds = kids.map(k => k.id);
+      const [
+        { data: gradesData },
+        { data: attendanceData },
+        { data: feesData },
+        { data: noticesData }
+      ] = await Promise.all([
+        supabaseAdmin.from("grades").select("*").in("student_id", studentIds),
+        supabaseAdmin.from("attendance").select("*").in("student_id", studentIds),
+        supabaseAdmin.from("fees").select("*").in("student_id", studentIds),
+        supabaseAdmin.from("announcements").select("*")
+      ]);
+
+      return {
+        success: true,
+        kidsData: kids,
+        gradesData: gradesData || [],
+        attendanceData: attendanceData || [],
+        feesData: feesData || [],
+        noticesData: noticesData || []
+      };
+    }
+
+    const studentIds = kidsData.map(k => k.id);
+    const [
+      { data: gradesData },
+      { data: attendanceData },
+      { data: feesData },
+      { data: noticesData }
+    ] = await Promise.all([
+      supabaseAdmin.from("grades").select("*").in("student_id", studentIds),
+      supabaseAdmin.from("attendance").select("*").in("student_id", studentIds),
+      supabaseAdmin.from("fees").select("*").in("student_id", studentIds),
+      supabaseAdmin.from("announcements").select("*")
+    ]);
+
+    return {
+      success: true,
+      kidsData,
+      gradesData: gradesData || [],
+      attendanceData: attendanceData || [],
+      feesData: feesData || [],
+      noticesData: noticesData || []
+    };
+  } catch (err: any) {
+    console.error("fetchParentPortalData error:", err);
+    return { success: false, error: err.message };
+  }
+}

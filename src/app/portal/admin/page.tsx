@@ -33,31 +33,10 @@ import { AnalyticsTab } from "@/components/AdminPortal/AnalyticsTab";
 import { SettingsTab } from "@/components/AdminPortal/SettingsTab";
 
 // Static mock databases
-const initialStudentsList: Student[] = [
-  { id: "stu-1", name: "Aarav Sharma", grade: "Class VIII", rollNo: "12", parent: "Priya Sharma", status: StudentStatus.Active, enrollmentDate: "2025-06-15" },
-  { id: "stu-2", name: "Aisha Khan", grade: "Class IX", rollNo: "01", parent: "Zafar Khan", status: StudentStatus.Active, enrollmentDate: "2025-06-15" },
-  { id: "stu-3", name: "Rohan Das", grade: "Class IX", rollNo: "02", parent: "Nikhil Das", status: StudentStatus.Active, enrollmentDate: "2025-06-15" },
-  { id: "stu-4", name: "Sneha Reddy", grade: "Class IX", rollNo: "03", parent: "Kiran Reddy", status: StudentStatus.Suspended, enrollmentDate: "2025-06-15" },
-];
-
-const initialApplicationsList: Application[] = [
-  { id: "app-1", name: "Meera Kapoor", email: "meera@demo.com", phone: "+91 98765 11111", grade: "Class V", date: "2026-06-28", status: ApplicationStatus.Pending, appliedDate: "2026-06-28" },
-  { id: "app-2", name: "Aditya Malhotra", email: "aditya@demo.com", phone: "+91 98765 22222", grade: "Class I", date: "2026-06-27", status: ApplicationStatus.Approved, appliedDate: "2026-06-27" },
-  { id: "app-3", name: "Sanya Gupta", email: "sanya@demo.com", phone: "+91 98765 33333", grade: "Nursery", date: "2026-06-27", status: ApplicationStatus.UnderReview, appliedDate: "2026-06-27" },
-  { id: "app-4", name: "Rishi Patel", email: "rishi@demo.com", phone: "+91 98765 44444", grade: "Class VIII", date: "2026-06-26", status: ApplicationStatus.Approved, appliedDate: "2026-06-26" },
-  { id: "app-5", name: "Tanvi Jain", email: "tanvi@demo.com", phone: "+91 98765 55555", grade: "Class III", date: "2026-06-26", status: ApplicationStatus.Rejected, appliedDate: "2026-06-26" },
-];
-
-const initialPaymentsList: Payment[] = [
-  { id: "pay-1", family: "Sharma family", amount: 55000, method: PaymentMethod.UPI, date: "2026-06-30", referenceNo: "TXN55000", status: "Success", term: "Term 1", createdAt: "2026-06-30T10:30:00Z", updatedAt: "2026-06-30T10:30:00Z" },
-  { id: "pay-2", family: "Kapoor family", amount: 18333, method: PaymentMethod.Card, date: "2026-06-30", referenceNo: "TXN18333", status: "Success", term: "Term 1", createdAt: "2026-06-30T11:00:00Z", updatedAt: "2026-06-30T11:00:00Z" },
-];
-
-const initialActivityList: ActivityLog[] = [
-  { id: "act-1", time: "10m ago", text: "New application received — Meera Kapoor (Class V)", type: "info", userId: "system", timestamp: Date.now() - 10 * 60000 },
-  { id: "act-2", time: "1h ago", text: "Fee payment received — ₹55,000 from Sharma family", type: "success", userId: "system", timestamp: Date.now() - 60 * 60000 },
-  { id: "act-3", time: "2h ago", text: "Admissions application approved — Aditya Malhotra (Class I)", type: "success", userId: "system", timestamp: Date.now() - 120 * 60000 },
-];
+const initialStudentsList: Student[] = [];
+const initialApplicationsList: Application[] = [];
+const initialPaymentsList: Payment[] = [];
+const initialActivityList: ActivityLog[] = [];
 
 const broadcastTemplates: BroadcastTemplate[] = [
   {
@@ -147,9 +126,9 @@ export default function AdminPortalPage() {
   };
 
   // Authenticated Admin Profile template
-  const adminUser: AdminUser = {
+  const [adminUser, setAdminUser] = useState<AdminUser>({
     id: "admin-1",
-    name: "Dr. Sanjay Kumar",
+    name: "Administrator",
     email: "admin@school.com",
     role: AdminRole.SuperAdmin,
     permissions: [
@@ -161,7 +140,7 @@ export default function AdminPortalPage() {
       "view_analytics"
     ],
     isActive: true
-  };
+  });
 
   // Persistent States - Now linked to Supabase
   const [students, setStudents] = useState<Student[]>([]);
@@ -185,6 +164,17 @@ export default function AdminPortalPage() {
 
     const fetchDatabase = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const namePart = user.email ? user.email.split('@')[0] : "Admin";
+          const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+          setAdminUser(prev => ({
+            ...prev,
+            id: user.id,
+            email: user.email || prev.email,
+            name: user.user_metadata?.full_name || formattedName
+          }));
+        }
         const [
           { data: stuData },
           { data: appData },
@@ -371,8 +361,13 @@ export default function AdminPortalPage() {
     if (!newStu.parentEmail?.trim()) errors.parentEmail = "Parent Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(newStu.parentEmail)) errors.parentEmail = "Invalid email format";
 
+    const cleanNewG = newStu.grade.toLowerCase().replace(/^class\s+/i, "").trim();
     const isDuplicate = students.some(
-      (s) => !s.deletedAt && s.grade === newStu.grade && s.rollNo === newStu.rollNo
+      (s) => {
+        if (s.deletedAt) return false;
+        const cleanSg = s.grade.toLowerCase().replace(/^class\s+/i, "").trim();
+        return cleanSg === cleanNewG && s.rollNo.toLowerCase().trim() === newStu.rollNo.toLowerCase().trim();
+      }
     );
     if (isDuplicate) {
       errors.rollNo = "Duplicate roll number exists in this grade!";

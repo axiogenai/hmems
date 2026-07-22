@@ -15,7 +15,7 @@ import { Assignment, AssignmentModal } from "@/components/TeacherPortal/Assignme
 import { ConfirmDialog } from "@/components/TeacherPortal/ConfirmDialog";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
 import { supabase } from "@/lib/supabase";
-import { resendPasswordLink } from "@/app/actions/auth";
+import { resendPasswordLink, fetchTeacherPortalData } from "@/app/actions/auth";
 import { useEffect } from "react";
 
 // ─── Data Model ───────────────────────────────────────────────────────────────
@@ -35,72 +35,15 @@ export interface ClassSubjectSlot {
 
 // Teacher profile — in a real app this comes from auth/API
 const TEACHER_PROFILE = {
-  name: "Mr. Rahul Verma",
-  initials: "RV",
-  email: "rahul.verma@school.com",
+  name: "Faculty Member",
+  initials: "FM",
+  email: "teacher@school.com",
   // All the class-subject combos this teacher handles
-  slots: [
-    { classId: "IX-A", subject: "Mathematics" },
-    { classId: "IX-B", subject: "Mathematics" },
-    { classId: "X-A",  subject: "Mathematics" },
-    { classId: "VIII-A", subject: "Science" },
-    { classId: "VIII-B", subject: "Science" },
-  ] as ClassSubjectSlot[],
+  slots: [] as ClassSubjectSlot[],
 };
 
 // Per-class student rosters
-const CLASS_ROSTERS: Record<string, Student[]> = {
-  "IX-A": [
-    { id: 1,  name: "Aisha Khan",      rollNo: "01", phone: "+91 98765 00001", email: "aisha@student.com" },
-    { id: 2,  name: "Rohan Das",       rollNo: "02", phone: "+91 98765 00002", email: "rohan@student.com" },
-    { id: 3,  name: "Sneha Reddy",     rollNo: "03", phone: "+91 98765 00003", email: "sneha@student.com" },
-    { id: 4,  name: "Arjun Mehta",     rollNo: "04", phone: "+91 98765 00004", email: "arjun@student.com" },
-    { id: 5,  name: "Kavya Iyer",      rollNo: "05", phone: "+91 98765 00005", email: "kavya@student.com" },
-    { id: 6,  name: "Vikram Singh",    rollNo: "06", phone: "+91 98765 00006", email: "vikram@student.com" },
-    { id: 7,  name: "Priya Sharma",    rollNo: "07", phone: "+91 98765 00007", email: "priya@student.com" },
-    { id: 8,  name: "Rahul Verma",     rollNo: "08", phone: "+91 98765 00008", email: "rahul.s@student.com" },
-    { id: 9,  name: "Ananya Deshmukh", rollNo: "09", phone: "+91 98765 00009", email: "ananya@student.com" },
-    { id: 10, name: "Deepak Patil",    rollNo: "10", phone: "+91 98765 00010", email: "deepak@student.com" },
-  ],
-  "IX-B": [
-    { id: 1,  name: "Siddharth Rao",   rollNo: "01", phone: "+91 98765 00101", email: "siddharth@student.com" },
-    { id: 2,  name: "Meera Nair",      rollNo: "02", phone: "+91 98765 00102", email: "meera@student.com" },
-    { id: 3,  name: "Aarav Joshi",     rollNo: "03", phone: "+91 98765 00103", email: "aarav@student.com" },
-    { id: 4,  name: "Divya Pillai",    rollNo: "04", phone: "+91 98765 00104", email: "divya@student.com" },
-    { id: 5,  name: "Karthik Menon",   rollNo: "05", phone: "+91 98765 00105", email: "karthik@student.com" },
-    { id: 6,  name: "Neha Kulkarni",   rollNo: "06", phone: "+91 98765 00106", email: "neha@student.com" },
-    { id: 7,  name: "Yash Gupta",      rollNo: "07", phone: "+91 98765 00107", email: "yash@student.com" },
-    { id: 8,  name: "Shreya Bose",     rollNo: "08", phone: "+91 98765 00108", email: "shreya@student.com" },
-  ],
-  "X-A": [
-    { id: 1,  name: "Ishaan Malhotra", rollNo: "01", phone: "+91 98765 00201", email: "ishaan@student.com" },
-    { id: 2,  name: "Tanvi Shah",      rollNo: "02", phone: "+91 98765 00202", email: "tanvi@student.com" },
-    { id: 3,  name: "Rohit Kumar",     rollNo: "03", phone: "+91 98765 00203", email: "rohit@student.com" },
-    { id: 4,  name: "Puja Agarwal",    rollNo: "04", phone: "+91 98765 00204", email: "puja@student.com" },
-    { id: 5,  name: "Nikhil Sinha",    rollNo: "05", phone: "+91 98765 00205", email: "nikhil@student.com" },
-    { id: 6,  name: "Aditi Mishra",    rollNo: "06", phone: "+91 98765 00206", email: "aditi@student.com" },
-    { id: 7,  name: "Pranav Tiwari",   rollNo: "07", phone: "+91 98765 00207", email: "pranav@student.com" },
-    { id: 8,  name: "Riya Pandey",     rollNo: "08", phone: "+91 98765 00208", email: "riya@student.com" },
-    { id: 9,  name: "Harsh Trivedi",   rollNo: "09", phone: "+91 98765 00209", email: "harsh@student.com" },
-  ],
-  "VIII-A": [
-    { id: 1,  name: "Arnav Chopra",    rollNo: "01", phone: "+91 98765 00301", email: "arnav@student.com" },
-    { id: 2,  name: "Sanya Khanna",    rollNo: "02", phone: "+91 98765 00302", email: "sanya@student.com" },
-    { id: 3,  name: "Dev Patel",       rollNo: "03", phone: "+91 98765 00303", email: "dev@student.com" },
-    { id: 4,  name: "Anika Sethi",     rollNo: "04", phone: "+91 98765 00304", email: "anika@student.com" },
-    { id: 5,  name: "Veer Kapoor",     rollNo: "05", phone: "+91 98765 00305", email: "veer@student.com" },
-    { id: 6,  name: "Roshni Das",      rollNo: "06", phone: "+91 98765 00306", email: "roshni@student.com" },
-    { id: 7,  name: "Kabir Saxena",    rollNo: "07", phone: "+91 98765 00307", email: "kabir@student.com" },
-  ],
-  "VIII-B": [
-    { id: 1,  name: "Tara Singh",      rollNo: "01", phone: "+91 98765 00401", email: "tara@student.com" },
-    { id: 2,  name: "Mihir Bhat",      rollNo: "02", phone: "+91 98765 00402", email: "mihir@student.com" },
-    { id: 3,  name: "Zara Ansari",     rollNo: "03", phone: "+91 98765 00403", email: "zara@student.com" },
-    { id: 4,  name: "Aditya Naik",     rollNo: "04", phone: "+91 98765 00404", email: "aditya@student.com" },
-    { id: 5,  name: "Pooja Hegde",     rollNo: "05", phone: "+91 98765 00405", email: "pooja@student.com" },
-    { id: 6,  name: "Sameer Goel",     rollNo: "06", phone: "+91 98765 00406", email: "sameer@student.com" },
-  ],
-};
+const CLASS_ROSTERS: Record<string, Student[]> = {};
 
 // Attendance: per class-subject key  → Record<studentId, present boolean>
 type AttendanceStore = Record<string, Record<number, boolean>>;
@@ -328,106 +271,59 @@ export default function TeacherPortalPage() {
   const [assignmentsStore, setAssignmentsStore] = useState<AssignmentStore>({});
   const [announcementsStore, setAnnouncementsStore] = useState<AnnouncementStore>({});
 
-  // Fetch Teacher Data from Supabase
+  // Fetch Teacher Data from Supabase via server action (bypasses RLS issues)
   useEffect(() => {
     if (!isLoggedIn) return;
     
     const fetchTeacherData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        
-        let teacherSlots = TEACHER_PROFILE.slots;
-        let rosters = CLASS_ROSTERS;
+        if (!user || !user.email) return;
 
-        if (user && user.email) {
-          // 1. Fetch Teacher record from DB by email OR id
-          const { data: teacherRecord } = await supabase
-            .from('teachers')
-            .select('*')
-            .or(`email.eq.${user.email},id.eq.${user.id}`)
-            .maybeSingle();
-          
-          let teacherName = teacherRecord?.name || user.email.split('@')[0];
-          if (!teacherRecord && teacherName.toLowerCase().startsWith('admin')) {
-            teacherName = "Faculty Member";
-          }
-
-          const nameParts = teacherName.trim().split(" ");
-          const initials = nameParts.length >= 2 
-            ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
-            : teacherName.substring(0, 2).toUpperCase();
-
-          const teacherIdToUse = teacherRecord?.id || user.id;
-
-          // 2. Fetch Assignments
-          const { data: assignments } = await supabase
-            .from('teacher_assignments')
-            .select('*')
-            .eq('teacher_id', teacherIdToUse);
-          
-          if (assignments && assignments.length > 0) {
-            teacherSlots = assignments.map((a: any) => ({
-              classId: a.class_id,
-              subject: a.subject,
-            }));
-          }
-
-          setCurrentTeacher({
-            name: teacherName,
-            initials: initials,
-            email: user.email,
-            slots: teacherSlots
-          });
-
-          setDynamicSlots(teacherSlots);
-          setActiveSlot(teacherSlots[0]);
-
-          // 3. Fetch Students for these classes
-          const classIds = [...new Set(teacherSlots.map(s => s.classId))];
-          rosters = {};
-          
-          for (const classId of classIds) {
-            const [grade, section] = classId.split('-');
-            let query = supabase.from('students').select('*').eq('grade', grade);
-            if (section) query = query.eq('section', section);
-            
-            const { data: students } = await query;
-            if (students) {
-              rosters[classId] = students.map(s => ({
-                id: s.id,
-                name: s.name,
-                rollNo: s.roll_no,
-                phone: s.phone || '',
-                email: s.email || ''
-              })) as any;
-            } else {
-              rosters[classId] = [];
-            }
-          }
-          setDynamicRosters(rosters);
+        const serverRes = await fetchTeacherPortalData(user.email);
+        if (!serverRes.success) {
+          console.warn("fetchTeacherPortalData server warning:", serverRes.error);
+          return;
         }
 
-        const classIds = teacherSlots.map(s => s.classId);
+        const { teacherRecord, assignments, rosters, gradesData, assignmentsData, attendanceData, announcementsData } = serverRes;
 
-        const [
-          { data: gradesData },
-          { data: assignmentsData },
-          { data: attendanceData },
-          { data: announcementsData }
-        ] = await Promise.all([
-          supabase.from("grades").select("*").in("class_id", classIds),
-          supabase.from("assignments").select("*").in("class_id", classIds),
-          supabase.from("attendance").select("*").in("class_id", classIds),
-          supabase.from("announcements").select("*").in("class_id", classIds)
-        ]);
-        
+        let teacherName = teacherRecord?.name || user.email.split('@')[0];
+        if (!teacherRecord && teacherName.toLowerCase().startsWith('admin')) {
+          teacherName = "Faculty Member";
+        }
+
+        const nameParts = teacherName.trim().split(" ");
+        const initials = nameParts.length >= 2 
+          ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+          : teacherName.substring(0, 2).toUpperCase();
+
+        const teacherSlots = (assignments || []).map((a: any) => ({
+          classId: a.class_id,
+          subject: a.subject,
+        }));
+
+        setCurrentTeacher({
+          name: teacherName,
+          initials: initials,
+          email: user.email,
+          slots: teacherSlots
+        });
+
+        setDynamicSlots(teacherSlots);
+        if (teacherSlots.length > 0) {
+          setActiveSlot(teacherSlots[0]);
+        }
+
+        setDynamicRosters(rosters || {});
+
         // Rebuild Stores grouped by slotKey(classId, subject)
         const newGradesStore: GradeStore = {};
         if (gradesData) {
-          gradesData.forEach((g) => {
+          gradesData.forEach((g: any) => {
             const key = slotKey(g.class_id, g.subject);
             if (!newGradesStore[key]) newGradesStore[key] = [];
-            const studentInfo = Object.values(rosters).flat().find(s => String(s.id) === String(g.student_id));
+            const studentInfo = Object.values(rosters || {}).flat().find((s: any) => String(s.id) === String(g.student_id));
             newGradesStore[key].push({
               id: g.id,
               student: studentInfo ? studentInfo.name : "Unknown",
@@ -442,7 +338,7 @@ export default function TeacherPortalPage() {
         
         const newAssignmentsStore: AssignmentStore = {};
         if (assignmentsData) {
-          assignmentsData.forEach((a) => {
+          assignmentsData.forEach((a: any) => {
             const key = slotKey(a.class_id, a.subject);
             if (!newAssignmentsStore[key]) newAssignmentsStore[key] = [];
             newAssignmentsStore[key].push({
@@ -459,7 +355,7 @@ export default function TeacherPortalPage() {
         
         const newAnnouncementsStore: AnnouncementStore = {};
         if (announcementsData) {
-          announcementsData.forEach((a) => {
+          announcementsData.forEach((a: any) => {
             if (!a.class_id) return;
             const key = slotKey(a.class_id, a.subject || "");
             if (!newAnnouncementsStore[key]) newAnnouncementsStore[key] = [];

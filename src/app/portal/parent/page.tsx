@@ -11,7 +11,7 @@ import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { ParentPortalUser, StudentProfile, ChildGrade, FeeRecord, Announcement, AttendanceRecord, PaymentTransaction, NotificationPreference } from "@/types/parent-portal";
 import { supabase } from "@/lib/supabase";
-import { resendPasswordLink } from "@/app/actions/auth";
+import { resendPasswordLink, fetchParentPortalData } from "@/app/actions/auth";
 
 // Import modular portal components
 import { ChildSelector } from "@/components/ParentPortal/ChildSelector";
@@ -27,56 +27,18 @@ import { ConfirmDialog } from "@/components/TeacherPortal/ConfirmDialog";
 // Static parent entity templates
 const demoParentUser: ParentPortalUser = {
   id: "parent-1",
-  name: "Priya Sharma",
-  email: "priya@demo.com",
-  phone: "+91 98765 00007",
+  name: "Parent",
+  email: "parent@school.com",
+  phone: "",
   role: "parent",
-  children: [
-    { id: "student-1", name: "Aarav Sharma", rollNo: "07", grade: "VIII", section: "A", dob: "2012-05-15", parentId: "parent-1", academicYear: "2026-27", currentGPA: 3.82, status: "Active" },
-    { id: "student-2", name: "Riya Sharma", rollNo: "12", grade: "VI", section: "B", dob: "2014-08-22", parentId: "parent-1", academicYear: "2026-27", currentGPA: 3.54, status: "Active" }
-  ]
+  children: []
 };
 
-const initialChildGrades: ChildGrade[] = [
-  { studentId: "student-1", subject: "Mathematics", test: "Unit Test 3", score: 92, maxScore: 100, grade: "A+", percentage: 92, date: "2026-06-28" },
-  { studentId: "student-1", subject: "Science", test: "Unit Test 3", score: 88, maxScore: 100, grade: "A", percentage: 88, date: "2026-06-25" },
-  { studentId: "student-1", subject: "English", test: "Unit Test 3", score: 95, maxScore: 100, grade: "A+", percentage: 95, date: "2026-06-24" },
-  { studentId: "student-2", subject: "Mathematics", test: "Unit Test 3", score: 85, maxScore: 100, grade: "A", percentage: 85, date: "2026-06-28" },
-  { studentId: "student-2", subject: "Science", test: "Unit Test 3", score: 91, maxScore: 100, grade: "A+", percentage: 91, date: "2026-06-25" },
-  { studentId: "student-2", subject: "English", test: "Unit Test 3", score: 82, maxScore: 100, grade: "B+", percentage: 82, date: "2026-06-24" },
-];
-
-const initialAttendanceRecords: AttendanceRecord[] = [
-  { id: "att-1", studentId: "student-1", date: "2026-06-29", status: "Present", remarks: "On time" },
-  { id: "att-2", studentId: "student-1", date: "2026-06-28", status: "Present", remarks: "Regular" },
-  { id: "att-3", studentId: "student-1", date: "2026-06-27", status: "Absent", reason: "Fever", remarks: "Informed by parent via leave portal" },
-  { id: "att-4", studentId: "student-1", date: "2026-06-26", status: "Present" },
-  { id: "att-5", studentId: "student-1", date: "2026-06-25", status: "Late", remarks: "Missed transport" },
-  { id: "att-6", studentId: "student-2", date: "2026-06-29", status: "Present", remarks: "On time" },
-  { id: "att-7", studentId: "student-2", date: "2026-06-28", status: "Present" },
-  { id: "att-8", studentId: "student-2", date: "2026-06-27", status: "Present" },
-  { id: "att-9", studentId: "student-2", date: "2026-06-26", status: "Present" },
-  { id: "att-10", studentId: "student-2", date: "2026-06-25", status: "Present" },
-];
-
-const initialFeeRecords: FeeRecord[] = [
-  { id: "fee-1", studentId: "student-1", term: "Term 2 Tuition Fee", amount: 18333, dueDate: "2026-08-01", status: "Pending" },
-  { id: "fee-2", studentId: "student-1", term: "Bus Transport Fee", amount: 4500, dueDate: "2026-07-15", status: "Pending" },
-  { id: "fee-3", studentId: "student-1", term: "Term 1 Tuition Fee", amount: 18333, dueDate: "2026-04-01", paidDate: "2026-04-01", status: "Paid", receiptUrl: "#" },
-  { id: "fee-4", studentId: "student-2", term: "Term 2 Tuition Fee", amount: 15400, dueDate: "2026-08-01", status: "Pending" },
-  { id: "fee-5", studentId: "student-2", term: "Term 1 Tuition Fee", amount: 15400, dueDate: "2026-04-01", paidDate: "2026-04-01", status: "Paid", receiptUrl: "#" },
-];
-
-const initialAnnouncements: Announcement[] = [
-  { id: "notice-1", title: "Parent-Teacher Meeting — July 12", content: "PTM will be held from 9:00 AM to 1:00 PM. Please bring the latest UT-3 scorecard.", date: "Jun 28, 2026", priority: "High", target: "All", read: false },
-  { id: "notice-2", title: "Unit Test 3 results uploaded", content: "Aarav and Riya's grades have been uploaded. Detailed breakdowns are visible on the dashboard.", date: "Jun 25, 2026", priority: "Normal", target: "All", read: false },
-];
-
-const chatContacts = [
-  { id: "sunita", name: "Mrs. Sunita", subject: "Mathematics", initial: "S" },
-  { id: "rahul", name: "Mr. Rahul Verma", subject: "Science (Class Teacher)", initial: "RV" },
-  { id: "abhishek", name: "Mr. Abhishek Jain", subject: "English", initial: "AJ" },
-];
+const initialChildGrades: ChildGrade[] = [];
+const initialAttendanceRecords: AttendanceRecord[] = [];
+const initialFeeRecords: FeeRecord[] = [];
+const initialAnnouncements: Announcement[] = [];
+const chatContacts: any[] = [];
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
@@ -167,36 +129,50 @@ export default function ParentPortalPage() {
   const [parentEmailAddress, setParentEmailAddress] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
 
+  const selectedChild = useMemo(() => {
+    return childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || {
+      id: "student-1",
+      name: "Loading...",
+      rollNo: "--",
+      grade: "--",
+      section: "--",
+      dob: "",
+      parentId: "",
+      academicYear: "2026-27",
+      currentGPA: 3.5,
+      status: "Active"
+    };
+  }, [childrenList, selectedChildId]);
+
   // Persistent States - Now linked to Supabase
   const [childGrades, setChildGrades] = useState<ChildGrade[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
-  // Fetch Parent Data
+  // Fetch Parent Data from Supabase via server action (bypasses RLS issues)
   useEffect(() => {
     if (!isLoggedIn) return;
 
     const fetchParentData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user || !user.email) return;
 
-        setParentEmailAddress(user.email || "");
+        setParentEmailAddress(user.email);
 
-        // Fetch parent's children (students linked by parent_id or parent email)
-        const { data: kidsData, error: kidsError } = await supabase
-          .from("students")
-          .select("*")
-          .or(`parent_id.eq.${user.id},email.eq.${user.email}`);
+        const serverRes = await fetchParentPortalData(user.email);
+        if (!serverRes.success) {
+          console.warn("fetchParentPortalData server warning:", serverRes.error);
+          return;
+        }
 
-        if (kidsError) throw kidsError;
+        const { kidsData, gradesData, attendanceData, feesData, noticesData } = serverRes;
 
         if (kidsData && kidsData.length > 0) {
-          // Parent name from student's parent name entry or email
           setParentName(kidsData[0].parent || (user.email ? user.email.split('@')[0] : "Parent"));
 
-          const mappedChildren: StudentProfile[] = kidsData.map(k => ({
+          const mappedChildren: StudentProfile[] = kidsData.map((k: any) => ({
             id: k.id,
             name: k.name,
             rollNo: k.roll_no,
@@ -205,29 +181,15 @@ export default function ParentPortalPage() {
             dob: k.dob || "",
             parentId: k.parent_id || "",
             academicYear: "2026-27",
-            currentGPA: 3.8, // default fallback
+            currentGPA: 3.8,
             status: k.status as any
           }));
 
           setChildrenList(mappedChildren);
           setSelectedChildId(mappedChildren[0].id);
 
-          const studentIds = mappedChildren.map(c => c.id);
-
-          const [
-            { data: gradesData },
-            { data: attendanceData },
-            { data: feesData },
-            { data: noticesData }
-          ] = await Promise.all([
-            supabase.from("grades").select("*").in("student_id", studentIds),
-            supabase.from("attendance").select("*").in("student_id", studentIds),
-            supabase.from("fees").select("*").in("student_id", studentIds),
-            supabase.from("announcements").select("*")
-          ]);
-
           if (gradesData) {
-            setChildGrades(gradesData.map(g => {
+            setChildGrades(gradesData.map((g: any) => {
               const scoreNum = Number(g.score);
               const maxNum = Number(g.max_score);
               const pct = maxNum > 0 ? (scoreNum / maxNum) * 100 : 0;
@@ -246,7 +208,7 @@ export default function ParentPortalPage() {
           }
 
           if (attendanceData) {
-            setAttendance(attendanceData.map(a => ({
+            setAttendance(attendanceData.map((a: any) => ({
               id: a.id,
               studentId: a.student_id,
               date: a.date,
@@ -257,7 +219,7 @@ export default function ParentPortalPage() {
           }
 
           if (feesData && feesData.length > 0) {
-            setFeeRecords(feesData.map(f => ({
+            setFeeRecords(feesData.map((f: any) => ({
               id: f.id,
               studentId: f.student_id,
               term: f.term,
@@ -302,9 +264,9 @@ export default function ParentPortalPage() {
 
           if (noticesData) {
             const studentGradesList = mappedChildren.map(c => c.grade);
-            const filteredNotices = noticesData.filter(n => !n.class_id || n.class_id === "All" || studentGradesList.includes(n.class_id));
+            const filteredNotices = noticesData.filter((n: any) => !n.class_id || n.class_id === "All" || studentGradesList.includes(n.class_id));
 
-            setAnnouncements(filteredNotices.map(n => ({
+            setAnnouncements(filteredNotices.map((n: any) => ({
               id: n.id,
               title: n.title,
               content: n.content || "",
@@ -323,6 +285,68 @@ export default function ParentPortalPage() {
     };
     fetchParentData();
   }, [isLoggedIn]);
+
+  // Fetch Teachers for Child's Class to populate Chat Contacts
+  useEffect(() => {
+    if (!isLoggedIn || !selectedChild || selectedChild.id === "student-1") return;
+
+    const fetchTeachers = async () => {
+      try {
+        const cleanGrade = selectedChild.grade.replace(/^Class\s+/i, "").trim();
+        const possibleGrades = [cleanGrade, `Class ${cleanGrade}`, `Class  ${cleanGrade}`];
+
+        // 1. Fetch Teacher Assignments for this Class Grade
+        const { data: assignments } = await supabase
+          .from("teacher_assignments")
+          .select("teacher_id, subject")
+          .in("class_id", possibleGrades);
+
+        if (assignments && assignments.length > 0) {
+          const teacherIds = [...new Set(assignments.map(a => a.teacher_id))];
+
+          // 2. Fetch Teachers details
+          const { data: teachers } = await supabase
+            .from("teachers")
+            .select("id, name")
+            .in("id", teacherIds)
+            .eq("status", "Active");
+
+          if (teachers) {
+            const mappedContacts = teachers.map(t => {
+              const matchedAss = assignments.find(a => a.teacher_id === t.id);
+              const subjectName = matchedAss ? matchedAss.subject : "Teacher";
+              const initials = t.name
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .substring(0, 2)
+                .toUpperCase();
+
+              return {
+                id: t.id,
+                name: t.name,
+                subject: subjectName,
+                initial: initials
+              };
+            });
+
+            setChatContactsList(mappedContacts);
+            setSelectedContact(mappedContacts[0] || null);
+          } else {
+            setChatContactsList([]);
+            setSelectedContact(null);
+          }
+        } else {
+          setChatContactsList([]);
+          setSelectedContact(null);
+        }
+      } catch (err) {
+        console.error("Error fetching chat contacts:", err);
+      }
+    };
+
+    fetchTeachers();
+  }, [isLoggedIn, selectedChild]);
 
   // Settings prefs
   const [notificationPrefs, setNotificationPrefs] = useLocalStorage<NotificationPreference>("parent-notif-prefs", {
@@ -358,33 +382,12 @@ export default function ParentPortalPage() {
   };
 
   // Messaging States
-  const [selectedContact, setSelectedContact] = useState(chatContacts[1]);
-  const [chatMessages, setChatMessages] = useLocalStorage<Record<string, { sender: "parent" | "teacher", text: string, time: string }[]>>("parent-chat", {
-    rahul: [
-      { sender: "teacher", text: "Hello! Aarav performed very well in his science practical today.", time: "10:30 AM" },
-      { sender: "parent", text: "Thank you Mr. Rahul, glad to hear that!", time: "10:35 AM" }
-    ],
-    sunita: [
-      { sender: "teacher", text: "Aarav needs to practice quadratic equations a bit more.", time: "Yesterday" }
-    ]
-  });
+  const [chatContactsList, setChatContactsList] = useState<{ id: string, name: string, subject: string, initial: string }[]>([]);
+  const [selectedContact, setSelectedContact] = useState<{ id: string, name: string, subject: string, initial: string } | null>(null);
+  const [chatMessages, setChatMessages] = useLocalStorage<Record<string, { sender: "parent" | "teacher", text: string, time: string }[]>>("parent-chat", {});
   const [messageText, setMessageText] = useState("");
 
   // Computed states
-  const selectedChild = useMemo(() => {
-    return childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || {
-      id: "student-1",
-      name: "Loading...",
-      rollNo: "--",
-      grade: "--",
-      section: "--",
-      dob: "",
-      parentId: "",
-      academicYear: "2026-27",
-      currentGPA: 3.5,
-      status: "Active"
-    };
-  }, [childrenList, selectedChildId]);
 
   const selectedChildGrades = useMemo(() => {
     return childGrades.filter((g) => g.studentId === selectedChildId);
@@ -572,7 +575,7 @@ export default function ParentPortalPage() {
   // Chat direct thread controls
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim()) return;
+    if (!selectedContact || !messageText.trim()) return;
 
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
     const currentMessages = chatMessages[selectedContact.id] || [];
@@ -1009,7 +1012,7 @@ export default function ParentPortalPage() {
                   announcements={announcements}
                   unreadCount={unreadNoticesCount}
                   selectedContact={selectedContact}
-                  chatContacts={chatContacts}
+                  chatContacts={chatContactsList}
                   chatMessages={chatMessages}
                   messageText={messageText}
                   onSendMessage={handleSendMessage}
