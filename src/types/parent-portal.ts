@@ -48,7 +48,7 @@ export interface Announcement {
   content: string;
   date: string;
   priority: "High" | "Normal" | "Low";
-  target: "All" | "Specific" | "Class" | "Individual";
+  target: "All" | "Specific" | "Class" | "Individual" | "Parents" | "Teachers";
   read: boolean;
 }
 

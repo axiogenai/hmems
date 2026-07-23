@@ -32,14 +32,17 @@ const categoryGradients = [
   "from-emerald-400 to-teal-600",
 ];
 
-const allCategories = ["All", ...Array.from(new Set(blogPosts.map((p) => p.category)))];
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export default function BlogPage() {
+  const [blogs] = useLocalStorage("cms_blog_posts", blogPosts);
   const [activeCategory, setActiveCategory] = useState("All");
 
+  const allCategories = ["All", ...Array.from(new Set(blogs.map((p) => p.category)))];
+
   const filtered = activeCategory === "All"
-    ? blogPosts
-    : blogPosts.filter((p) => p.category === activeCategory);
+    ? blogs
+    : blogs.filter((p) => p.category === activeCategory);
 
   return (
     <div>

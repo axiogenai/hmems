@@ -115,6 +115,11 @@ export interface ConfigVersion {
     foundedYear: number;
     phone: string;
     email: string;
+    principalName?: string;
+    principalRole?: string;
+    principalMessage?: string;
+    principalPhoto?: string;
+    [key: string]: any;
   };
   changedBy: string;
   description: string;

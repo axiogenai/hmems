@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { Home, ChevronRight, GraduationCap, Briefcase, Mail } from "lucide-react";
-import { faculty } from "@/data/site-data";
+import { Home, ChevronRight, GraduationCap, Briefcase, Mail, Loader2 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
+import { fetchFacultyMembers } from "@/app/actions/auth";
 
 const FadeIn = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => (
   <motion.div
@@ -35,7 +35,7 @@ function getInitials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-function FacultyCard({ member }: { member: typeof faculty[0] }) {
+function FacultyCard({ member }: { member: any }) {
   const [hovered, setHovered] = useState(false);
   const gradient = departmentGradients[member.department] || "from-primary to-secondary";
 
@@ -76,7 +76,7 @@ function FacultyCard({ member }: { member: typeof faculty[0] }) {
             </div>
             <div className="flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
               <Briefcase size={13} className="text-slate-400 shrink-0" />
-              <span>{member.experience} experience</span>
+              <span>{member.experience}</span>
             </div>
           </div>
         </div>
@@ -107,10 +107,28 @@ function FacultyCard({ member }: { member: typeof faculty[0] }) {
 
 export default function FacultyPage() {
   const [activeDept, setActiveDept] = useState("All");
+  const [facultyMembers, setFacultyMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFaculty = async () => {
+      try {
+        const res = await fetchFacultyMembers();
+        if (res.success && res.facultyList) {
+          setFacultyMembers(res.facultyList);
+        }
+      } catch (err) {
+        console.error("Failed to load faculty:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadFaculty();
+  }, []);
 
   const filtered = activeDept === "All"
-    ? faculty
-    : faculty.filter((f) => f.department === activeDept);
+    ? facultyMembers
+    : facultyMembers.filter((f) => f.department === activeDept);
 
   return (
     <div>
@@ -155,17 +173,26 @@ export default function FacultyPage() {
       {/* Faculty Grid */}
       <section className="section-padding bg-surface">
         <div className="container-custom">
-          <LayoutGroup>
-            <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <AnimatePresence>
-                {filtered.map((member) => (
-                  <FacultyCard key={member.id} member={member} />
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          </LayoutGroup>
-          {filtered.length === 0 && (
-            <div className="text-center py-20 text-muted">No faculty found in this department.</div>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+              <Loader2 className="animate-spin text-accent" size={32} />
+              <p className="text-sm font-semibold">Loading faculty directory...</p>
+            </div>
+          ) : (
+            <>
+              <LayoutGroup>
+                <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <AnimatePresence>
+                    {filtered.map((member) => (
+                      <FacultyCard key={member.id} member={member} />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </LayoutGroup>
+              {filtered.length === 0 && (
+                <div className="text-center py-20 text-muted">No faculty members found in this category.</div>
+              )}
+            </>
           )}
         </div>
       </section>

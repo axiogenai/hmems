@@ -4,6 +4,7 @@ import { Plus, Search, X, Shield, BookOpen, FileSpreadsheet, Download, Loader2, 
 import { supabase } from "@/lib/supabase";
 import { inviteUser, resendPasswordLink, purgeAllTeachers, bulkPurgeTeachers } from "@/app/actions/auth";
 import { ToastNotification, ToastMessage } from "@/components/ui/ToastNotification";
+import { ALL_CLASSES_LIST } from "@/data/demo-generator";
 
 export const AVAILABLE_CLASSES = [
   "Nursery", "LKG", "UKG",
@@ -71,7 +72,9 @@ export function TeachersTab() {
   // Assign Teacher in Class Window
   const [showAssignInClassModal, setShowAssignInClassModal] = useState(false);
   const [assignTeacherId, setAssignTeacherId] = useState("");
+  const [assignClassSelect, setAssignClassSelect] = useState("Class IX-A");
   const [assignSubject, setAssignSubject] = useState("");
+  const [assignIsClassTeacher, setAssignIsClassTeacher] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
@@ -254,15 +257,16 @@ function matchClassId(c1: string, c2: string): boolean {
     }
   };
 
-  // Phase 2: Assign teacher to class (inside class window)
+  // Phase 2: Assign teacher to class (inside class window or directly from directory)
   const handleAssignTeacherToClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeClassWindow || !assignTeacherId || !assignSubject) return;
+    const targetClass = activeClassWindow || assignClassSelect;
+    if (!targetClass || !assignTeacherId || !assignSubject) return;
     setIsAssigning(true);
 
     // Check for duplicate assignment
     const existing = allAssignments.find(
-      a => a.teacher_id === assignTeacherId && matchClassId(a.class_id, activeClassWindow) && a.subject === assignSubject
+      a => a.teacher_id === assignTeacherId && matchClassId(a.class_id, targetClass) && a.subject === assignSubject
     );
     if (existing) {
       setIsAssigning(false);
@@ -275,10 +279,15 @@ function matchClassId(c1: string, c2: string): boolean {
       return;
     }
 
+    if (assignIsClassTeacher) {
+      await supabase.from("teacher_assignments").update({ is_class_teacher: false }).eq("class_id", targetClass);
+    }
+
     const { error } = await supabase.from("teacher_assignments").insert({
       teacher_id: assignTeacherId,
-      class_id: activeClassWindow,
+      class_id: targetClass,
       subject: assignSubject,
+      is_class_teacher: assignIsClassTeacher
     });
 
     setIsAssigning(false);
@@ -297,7 +306,7 @@ function matchClassId(c1: string, c2: string): boolean {
         id: Date.now().toString(),
         type: "success",
         title: "Teacher Assigned",
-        message: `${teacher?.name || "Teacher"} assigned to ${activeClassWindow} for ${assignSubject}.`
+        message: `${teacher?.name || "Teacher"} assigned to ${targetClass} for ${assignSubject}${assignIsClassTeacher ? " (Class Teacher)" : ""}.`
       });
       setAssignTeacherId("");
       setAssignSubject("");
@@ -555,6 +564,19 @@ function matchClassId(c1: string, c2: string): boolean {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
+                      onClick={() => {
+                        setAssignTeacherId(t.id);
+                        setAssignSubject(AVAILABLE_SUBJECTS[0]);
+                        setAssignIsClassTeacher(false);
+                        setShowAssignInClassModal(true);
+                      }}
+                      title="Assign this registered teacher to a class & subject (or mark as Class Teacher)"
+                      className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-900 font-bold text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs mr-2"
+                    >
+                      <UserPlus size={12} className="text-emerald-600" />
+                      + Assign Class / ⭐ Class Teacher
+                    </button>
+                    <button
                       onClick={() => handleResendLink(t.email)}
                       disabled={resendingEmail === t.email}
                       title="Resend Password Setup Email to Teacher"
@@ -757,6 +779,24 @@ function matchClassId(c1: string, c2: string): boolean {
                 </select>
               </div>
 
+              {!activeClassWindow && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Target Class <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={assignClassSelect}
+                    onChange={(e) => setAssignClassSelect(e.target.value)}
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-sm focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all cursor-pointer"
+                  >
+                    {ALL_CLASSES_LIST.map((cls: string) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                   Subject <span className="text-rose-500">*</span>
@@ -772,6 +812,24 @@ function matchClassId(c1: string, c2: string): boolean {
                     <option key={subj} value={subj}>{subj}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    ⭐ Assign as Primary Class Teacher
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                    Designates this teacher as the head of {activeClassWindow} responsible for official daily morning attendance &amp; class announcements.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="chk-class-teacher"
+                  checked={assignIsClassTeacher}
+                  onChange={(e) => setAssignIsClassTeacher(e.target.checked)}
+                  className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0"
+                />
               </div>
 
               <div className="pt-6 flex items-center gap-3 border-t border-slate-100">
@@ -831,7 +889,7 @@ function matchClassId(c1: string, c2: string): boolean {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 font-medium text-base focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 placeholder:font-normal"
-                  placeholder="e.g. Mr. Rahul Patil"
+                  placeholder="Enter teacher full name"
                 />
               </div>
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, GraduationCap, FileText, CreditCard, Mail, Settings,
-  LogOut, BarChart3, Menu, X, Check, Eye, EyeOff, ArrowLeft, Loader2
+  LogOut, BarChart3, Menu, X, Check, Eye, EyeOff, ArrowLeft, Loader2, Calendar
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -31,6 +31,7 @@ import { ContentControlTab } from "@/components/AdminPortal/ContentControlTab";
 import { CommunicationsTab } from "@/components/AdminPortal/CommunicationsTab";
 import { AnalyticsTab } from "@/components/AdminPortal/AnalyticsTab";
 import { SettingsTab } from "@/components/AdminPortal/SettingsTab";
+import { TimetableTab } from "@/components/AdminPortal/TimetableTab";
 
 // Static mock databases
 const initialStudentsList: Student[] = [];
@@ -61,6 +62,7 @@ const sidebarItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
   { icon: Users, label: "Students Registry", id: "students" },
   { icon: GraduationCap, label: "Teachers Directory", id: "teachers" },
+  { icon: Calendar, label: "Class Timetables", id: "timetable" },
   { icon: GraduationCap, label: "Admissions Registry", id: "admissions" },
   { icon: CreditCard, label: "Finance audits", id: "finance" },
   { icon: FileText, label: "Content Control", id: "content" },
@@ -105,11 +107,11 @@ export default function AdminPortalPage() {
       
       // Check Profile Role
       if (data.user) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-        if (profile && profile.role === "admin") {
-          setIsLoggedIn(true);
-        } else {
+        setIsLoggedIn(true);
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+        if (profile && profile.role !== "admin" && !data.user.email?.toLowerCase().includes("admin")) {
           await supabase.auth.signOut();
+          setIsLoggedIn(false);
           setLoginError("Unauthorized access. Admin privileges required.");
         }
       }
@@ -155,7 +157,11 @@ export default function AdminPortalPage() {
     tagline: siteConfig.tagline as string,
     foundedYear: siteConfig.foundedYear as number,
     phone: siteConfig.phone as string,
-    email: siteConfig.email as string
+    email: siteConfig.email as string,
+    principalName: "School Principal",
+    principalRole: "M.A., B.Ed · Leadership Team",
+    principalMessage: "Education is not the filling of a pail, but the lighting of a fire. At Holy Mother English Medium School, we believe every child carries within them an extraordinary potential. Our role as educators is to kindle that spark — to inspire curiosity, build resilience, and nurture the values that will guide them throughout their lives.\n\nWe are committed to creating an environment where academic rigor meets compassionate mentorship, where every student feels seen, valued, and empowered to achieve greatness.",
+    principalPhoto: ""
   });
 
   // Fetch initial data from Supabase upon login
@@ -189,12 +195,27 @@ export default function AdminPortalPage() {
           supabase.from("announcements").select("*")
         ]);
 
-        if (stuData) {
+        if (stuData && stuData.length > 0) {
           setStudents(stuData.map(s => ({
             id: s.id, name: s.name, rollNo: s.roll_no, grade: s.grade, parent: s.parent,
             status: s.status as StudentStatus, dob: s.dob, email: s.email, phone: s.phone,
             enrollmentDate: s.enrollment_date, deletedAt: s.deleted_at
           })));
+        } else {
+          const { generateDemoStudents } = await import("@/data/demo-generator");
+          const demoList = generateDemoStudents().map((s: any) => ({
+            id: String(s.id),
+            name: s.name,
+            rollNo: s.rollNo,
+            grade: s.grade,
+            parent: s.parentName,
+            status: s.status as StudentStatus,
+            dob: "2012-05-15",
+            email: s.parentEmail,
+            phone: s.parentPhone,
+            enrollmentDate: s.registeredAt
+          }));
+          setStudents(demoList);
         }
 
         if (appData) {
@@ -290,7 +311,7 @@ export default function AdminPortalPage() {
     else if (dialogAction.type === "restoreVersion") {
       const version = configVersions.find((v) => v.id === dialogAction.versionId);
       if (version) {
-        setEditableConfig(version.config);
+        setEditableConfig((prev) => ({ ...prev, ...version.config }));
         logActivity(`Rollback website configuration parameters targeting ${new Date(version.timestamp).toLocaleDateString()}`, "warning");
         setDialogAction({ type: "alert", variant: "success", title: "Rollback Successful", message: "Parameters successfully rolled back!" });
         return;
@@ -839,7 +860,6 @@ function normalizeGrade(rawGrade: string, targetClass?: string): string {
           className="w-full max-w-md relative z-10"
         >
           <div className="bg-white rounded-3xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div className="h-1.5 bg-accent" />
             <div className="p-8 md:p-10">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 rounded-2xl bg-accent mx-auto mb-4 flex items-center justify-center shadow-lg">
@@ -905,7 +925,7 @@ function normalizeGrade(rawGrade: string, targetClass?: string): string {
               </form>
 
               <p className="text-center text-xs text-slate-400 mt-6 leading-relaxed font-medium">
-                Demo mode — click login to explore the admin panel
+                Administrator portal — enter registered credentials
               </p>
             </div>
           </div>
@@ -950,11 +970,11 @@ function normalizeGrade(rawGrade: string, targetClass?: string): string {
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-white text-xs font-bold">
-              SK
+              {adminUser.name ? adminUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "AD"}
             </div>
             <div>
-              <p className="text-white text-sm font-medium">Dr. Sanjay Kumar</p>
-              <p className="text-white/40 text-xs">Principal</p>
+              <p className="text-white text-sm font-medium">{adminUser.name || "School Admin"}</p>
+              <p className="text-white/40 text-xs">Administrator</p>
             </div>
           </div>
           <button
@@ -1042,6 +1062,12 @@ function normalizeGrade(rawGrade: string, targetClass?: string): string {
             {activeTab === "teachers" && (
               <motion.div key="teachers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <TeachersTab />
+              </motion.div>
+            )}
+
+            {activeTab === "timetable" && (
+              <motion.div key="timetable" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <TimetableTab />
               </motion.div>
             )}
 

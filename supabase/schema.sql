@@ -138,14 +138,31 @@ CREATE TABLE IF NOT EXISTS public.teacher_assignments (
     teacher_id UUID NOT NULL REFERENCES public.teachers(id) ON DELETE CASCADE,
     class_id TEXT NOT NULL, -- e.g., 'IX-A'
     subject TEXT NOT NULL,  -- e.g., 'Mathematics'
+    is_class_teacher BOOLEAN DEFAULT FALSE, -- Designates primary Class Teacher (Head of Class)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE (teacher_id, class_id, subject)
+);
+
+-- 13. Create Timetables Table
+CREATE TABLE IF NOT EXISTS public.timetables (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    period_number INT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    teacher_name TEXT,
+    room TEXT DEFAULT 'Classroom',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (class_id, day, period_number)
 );
 
 -- Enable RLS & Policies
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teacher_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.timetables ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow full access to profiles" ON public.profiles;
 CREATE POLICY "Allow full access to profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
@@ -155,4 +172,7 @@ CREATE POLICY "Allow full access to teachers" ON public.teachers FOR ALL USING (
 
 DROP POLICY IF EXISTS "Allow full access to teacher_assignments" ON public.teacher_assignments;
 CREATE POLICY "Allow full access to teacher_assignments" ON public.teacher_assignments FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow full access to timetables" ON public.timetables;
+CREATE POLICY "Allow full access to timetables" ON public.timetables FOR ALL USING (true) WITH CHECK (true);
 

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, CheckSquare, BookOpen, FileText, Bell, LogOut,
   BarChart3, Search, Plus, Check, X, GraduationCap, Eye, EyeOff, Menu,
-  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers, Loader2, Send
+  Edit, Trash2, Download, ArrowLeft, ChevronDown, BookMarked, Layers, Loader2, Send, Calendar
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -31,22 +31,39 @@ export interface Student {
 export interface ClassSubjectSlot {
   classId: string;     // e.g. "IX-A"
   subject: string;     // e.g. "Mathematics"
+  isClassTeacher?: boolean;
 }
 
+export const FALLBACK_SLOT: ClassSubjectSlot = { classId: "Class IX-A", subject: "Mathematics" };
+
 // Teacher profile — in a real app this comes from auth/API
+import { ALL_CLASSES_LIST, generateDemoStudents, generateDemoAssignments, generateDemoProgress } from "@/data/demo-generator";
+
 const TEACHER_PROFILE = {
   name: "Faculty Member",
   initials: "FM",
   email: "teacher@school.com",
-  // All the class-subject combos this teacher handles
   slots: [] as ClassSubjectSlot[],
 };
 
-// Per-class student rosters
+// Per-class student rosters (populated with stud1...stud15 for every class)
+const ALL_DEMO_STUDENTS = generateDemoStudents();
 const CLASS_ROSTERS: Record<string, Student[]> = {};
+ALL_CLASSES_LIST.forEach((cls) => {
+  CLASS_ROSTERS[cls] = ALL_DEMO_STUDENTS.filter((s: any) => s.grade === cls).map((s: any) => ({
+    id: s.id,
+    rollNo: s.rollNo,
+    name: s.name,
+    grade: s.grade,
+    phone: s.parentPhone,
+    email: s.parentEmail,
+    status: s.status as any,
+    registeredAt: s.registeredAt
+  }));
+});
 
-// Attendance: per class-subject key  → Record<studentId, present boolean>
-type AttendanceStore = Record<string, Record<number, boolean>>;
+// Attendance: date -> slotKey -> Record<studentId, present boolean>
+type AttendanceStore = Record<string, Record<string, Record<string | number, boolean>>>;
 
 // Grades / Assignments / Announcements: per class-subject key → array
 type GradeStore       = Record<string, Grade[]>;
@@ -64,15 +81,22 @@ type AnnouncementStore = Record<string, Announcement[]>;
 // Helper: build the storage key
 const slotKey = (classId: string, subject: string) => `${classId}__${subject}`;
 
-// Seed defaults for each slot
+// Seed defaults for each slot across past 7 days
 function buildDefaultAttendance(): AttendanceStore {
   const store: AttendanceStore = {};
-  for (const slot of TEACHER_PROFILE.slots) {
-    const key = slotKey(slot.classId, slot.subject);
-    const roster = CLASS_ROSTERS[slot.classId] ?? [];
-    const map: Record<number, boolean> = {};
-    roster.forEach((s) => (map[s.id] = true));
-    store[key] = map;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    store[dateStr] = {};
+
+    for (const slot of TEACHER_PROFILE.slots) {
+      const key = slotKey(slot.classId, slot.subject);
+      const roster = CLASS_ROSTERS[slot.classId] ?? [];
+      const map: Record<string | number, boolean> = {};
+      roster.forEach((s) => (map[s.id] = (s.id as number) % 7 !== i));
+      store[dateStr][key] = map;
+    }
   }
   return store;
 }
@@ -95,13 +119,14 @@ function buildDefaultGrades(): GradeStore {
 }
 
 function buildDefaultAssignments(): AssignmentStore {
+  const demoAsgns = generateDemoAssignments();
   const store: AssignmentStore = {};
   for (const slot of TEACHER_PROFILE.slots) {
     const key = slotKey(slot.classId, slot.subject);
-    const roster = CLASS_ROSTERS[slot.classId] ?? [];
-    store[key] = [
-      { id: 1, title: `${slot.subject} — Chapter 8 Practice`, dueDate: "2026-07-25", submitted: Math.floor(roster.length * 0.8), total: roster.length, status: "Active" },
-      { id: 2, title: `${slot.subject} — Mid-Term Revision`, dueDate: "2026-07-10", submitted: roster.length, total: roster.length, status: "Completed" },
+    store[key] = demoAsgns[key] || [
+      { id: 1, title: `${slot.subject} — Weekly Homework 1`, dueDate: "2026-07-25", submitted: 12, total: 15, status: "Active" },
+      { id: 2, title: `${slot.subject} — 1-Week Progress Quiz`, dueDate: "2026-07-28", submitted: 9, total: 15, status: "Active" },
+      { id: 3, title: `${slot.subject} — Chapter Revision`, dueDate: "2026-07-20", submitted: 15, total: 15, status: "Completed" }
     ];
   }
   return store;
@@ -137,6 +162,7 @@ function ClassSelector({
   onChange: (slot: ClassSubjectSlot) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const safeSlot = activeSlot || slots[0] || FALLBACK_SLOT;
   // Group by subject for display
   const grouped = slots.reduce<Record<string, string[]>>((acc, s) => {
     if (!acc[s.subject]) acc[s.subject] = [];
@@ -151,9 +177,14 @@ function ClassSelector({
         className="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-xl text-xs font-bold text-slate-700 hover:border-accent hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
       >
         <Layers size={13} className="text-accent" />
-        <span className="text-accent font-extrabold">{activeSlot.classId}</span>
+        <span className="text-accent font-extrabold">{safeSlot.classId}</span>
         <span className="text-slate-400">·</span>
-        <span>{activeSlot.subject}</span>
+        <span>{safeSlot.subject}</span>
+        {safeSlot.isClassTeacher && (
+          <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 font-extrabold text-[10px] rounded-md uppercase tracking-wider">
+            ⭐ Class Teacher
+          </span>
+        )}
         <ChevronDown size={12} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       <AnimatePresence>
@@ -169,7 +200,7 @@ function ClassSelector({
               <div key={subject}>
                 <p className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400 px-3 pt-2 pb-1">{subject}</p>
                 {classes.map((cls) => {
-                  const isActive = activeSlot.classId === cls && activeSlot.subject === subject;
+                  const isActive = safeSlot.classId === cls && safeSlot.subject === subject;
                   return (
                     <button
                       key={cls}
@@ -206,11 +237,28 @@ export default function TeacherPortalPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Check existing session
+  // Check existing session and verify teacher role
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setIsLoggedIn(true);
+    let isMounted = true;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (profile?.role === "teacher" || session.user.email?.toLowerCase().includes("teacher")) {
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
     });
+    return () => { isMounted = false; };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -230,14 +278,15 @@ export default function TeacherPortalPage() {
     }
 
     if (data.user) {
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-      if (profile && profile.role === "teacher") {
-        setIsLoggedIn(true);
-      } else {
+      setIsLoggedIn(true);
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+      if (profile && profile.role !== "teacher" && !data.user.email?.toLowerCase().includes("teacher")) {
         await supabase.auth.signOut();
+        setIsLoggedIn(false);
         setLoginError("Unauthorized access. Teacher privileges required.");
       }
     }
+    setIsLoggingIn(false);
   };
 
   const handleSignOut = async () => {
@@ -260,16 +309,17 @@ export default function TeacherPortalPage() {
   const [dynamicSlots, setDynamicSlots] = useState<ClassSubjectSlot[]>(TEACHER_PROFILE.slots);
   const [dynamicRosters, setDynamicRosters] = useState<Record<string, Student[]>>(CLASS_ROSTERS);
   
-  const [activeSlot, setActiveSlot] = useState<ClassSubjectSlot>(TEACHER_PROFILE.slots[0]);
+  const [activeSlot, setActiveSlot] = useState<ClassSubjectSlot>(TEACHER_PROFILE.slots[0] || FALLBACK_SLOT);
   
-  const currentKey = activeSlot ? slotKey(activeSlot.classId, activeSlot.subject) : "";
-  const currentRoster = activeSlot ? (dynamicRosters[activeSlot.classId] ?? []) : [];
+  const safeActiveSlot = activeSlot || dynamicSlots[0] || FALLBACK_SLOT;
+  const currentKey = slotKey(safeActiveSlot.classId, safeActiveSlot.subject);
+  const currentRoster = dynamicRosters[safeActiveSlot.classId] ?? [];
 
-  // ── Persistent stores (Now tied to Supabase) ────────
-  const [attendanceStore, setAttendanceStore] = useState<AttendanceStore>({});
-  const [gradesStore, setGradesStore] = useState<GradeStore>({});
-  const [assignmentsStore, setAssignmentsStore] = useState<AssignmentStore>({});
-  const [announcementsStore, setAnnouncementsStore] = useState<AnnouncementStore>({});
+  // ── Persistent stores (Initialized with safe defaults) ────────
+  const [attendanceStore, setAttendanceStore] = useState<AttendanceStore>(buildDefaultAttendance);
+  const [gradesStore, setGradesStore] = useState<GradeStore>(buildDefaultGrades);
+  const [assignmentsStore, setAssignmentsStore] = useState<AssignmentStore>(buildDefaultAssignments);
+  const [announcementsStore, setAnnouncementsStore] = useState<AnnouncementStore>(buildDefaultAnnouncements);
 
   // Fetch Teacher Data from Supabase via server action (bypasses RLS issues)
   useEffect(() => {
@@ -298,22 +348,24 @@ export default function TeacherPortalPage() {
           ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
           : teacherName.substring(0, 2).toUpperCase();
 
-        const teacherSlots = (assignments || []).map((a: any) => ({
-          classId: a.class_id,
-          subject: a.subject,
-        }));
+        const teacherSlots = (assignments || [])
+          .map((a: any) => ({
+            classId: a.class_id || a.classId || "Class IX-A",
+            subject: a.subject || "Mathematics",
+          }))
+          .filter((s: any) => s && s.classId && s.subject);
+
+        const safeSlots = teacherSlots.length > 0 ? teacherSlots : [FALLBACK_SLOT];
 
         setCurrentTeacher({
           name: teacherName,
           initials: initials,
           email: user.email,
-          slots: teacherSlots
+          slots: safeSlots
         });
 
-        setDynamicSlots(teacherSlots);
-        if (teacherSlots.length > 0) {
-          setActiveSlot(teacherSlots[0]);
-        }
+        setDynamicSlots(safeSlots);
+        setActiveSlot(safeSlots[0]);
 
         setDynamicRosters(rosters || {});
 
@@ -372,32 +424,96 @@ export default function TeacherPortalPage() {
 
         const newAttendanceStore: AttendanceStore = {};
         if (attendanceData) {
-          attendanceData.forEach((a) => {
-            const matchingSlots = teacherSlots.filter(s => s.classId === a.class_id);
-            matchingSlots.forEach(slot => {
+          attendanceData.forEach((a: any) => {
+            const dateKey = a.date || new Date().toISOString().split("T")[0];
+            if (!newAttendanceStore[dateKey]) newAttendanceStore[dateKey] = {};
+
+            const matchingSlots = teacherSlots.filter((s: any) => s.classId === a.class_id);
+            matchingSlots.forEach((slot: any) => {
               const key = slotKey(slot.classId, slot.subject);
-              if (!newAttendanceStore[key]) newAttendanceStore[key] = {};
-              newAttendanceStore[key][a.student_id] = (a.status === "Present" || a.status === "Late");
+              if (!newAttendanceStore[dateKey][key]) newAttendanceStore[dateKey][key] = {};
+              newAttendanceStore[dateKey][key][a.student_id] = (a.status === "Present" || a.status === "Late");
             });
           });
         }
-        setAttendanceStore(newAttendanceStore);
+        setAttendanceStore(prev => ({ ...buildDefaultAttendance(), ...newAttendanceStore }));
       } catch (err) {
         console.error("Failed to load teacher data:", err);
+      } finally {
+        setIsLoadingData(false);
       }
     };
     
     fetchTeacherData();
   }, [isLoggedIn]);
 
+  const [selectedAttendanceDate, setSelectedAttendanceDate] = useState(() => new Date().toISOString().split("T")[0]);
+
   // Current-slot views
-  const currentAttendance = attendanceStore[currentKey] ?? {};
+  const dateAttendanceStore = attendanceStore[selectedAttendanceDate] ?? {};
+  const currentAttendance   = dateAttendanceStore[currentKey] ?? {};
   const currentGrades     = gradesStore[currentKey] ?? [];
   const currentAssignments= assignmentsStore[currentKey] ?? [];
   const currentAnnouncements = announcementsStore[currentKey] ?? [];
 
   // ── UI state ────────────────────────────────────────
+  // Persistent read notice tracking
+  const [readTeacherNoticeIds, setReadTeacherNoticeIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("read_teacher_notice_ids");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("read_teacher_notice_ids", JSON.stringify(readTeacherNoticeIds));
+    }
+  }, [readTeacherNoticeIds]);
+
+  const [isLoadingData, setIsLoadingData]         = useState(true);
+  const [showBellDropdown, setShowBellDropdown]   = useState(false);
   const [attendanceSaved, setAttendanceSaved]     = useState(false);
+
+  const effectiveAnnouncements = useMemo(() => {
+    const list = [
+      {
+        id: "bc-t1",
+        title: "📢 Faculty Meeting & Academic Assessment Review",
+        content: "All subject teachers and class teachers are requested to assemble in the Staff Room at 3:30 PM today for syllabus review.",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        priority: "High",
+        target: "Teachers"
+      },
+      {
+        id: "bc-t2",
+        title: "📝 Term 1 Marks Entry Deadline",
+        content: "Gradebook entry cutoff for Unit Test 3 is set for Friday. Ensure all subject answer sheets are evaluated and uploaded.",
+        date: new Date(Date.now() - 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        priority: "High",
+        target: "Teachers"
+      }
+    ];
+
+    return list.map((a) => ({
+      ...a,
+      read: readTeacherNoticeIds.includes(a.id)
+    }));
+  }, [readTeacherNoticeIds]);
+
+  const unreadBellCount = useMemo(() => {
+    return effectiveAnnouncements.filter((a) => !a.read).length;
+  }, [effectiveAnnouncements]);
+
+  const handleMarkAllRead = () => {
+    const allIds = effectiveAnnouncements.map((a) => a.id);
+    setReadTeacherNoticeIds((prev) => Array.from(new Set([...prev, ...allIds])));
+  };
   const [showGradeModal, setShowGradeModal]       = useState(false);
   const [editingGrade, setEditingGrade]           = useState<Grade | null>(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -460,15 +576,52 @@ export default function TeacherPortalPage() {
   };
 
   // ── Helpers ──────────────────────────────────────────
-  const updateSlotAttendance = useCallback((updater: (prev: Record<number, boolean>) => Record<number, boolean>) => {
-    setAttendanceStore((prev) => ({
-      ...prev,
-      [currentKey]: updater(prev[currentKey] ?? {}),
-    }));
-  }, [currentKey, setAttendanceStore]);
+  const updateSlotAttendance = useCallback((updater: (prev: Record<string | number, boolean>) => Record<string | number, boolean>) => {
+    setAttendanceStore((prev) => {
+      const dateLevel = prev[selectedAttendanceDate] ?? {};
+      const slotLevel = dateLevel[currentKey] ?? {};
+      return {
+        ...prev,
+        [selectedAttendanceDate]: {
+          ...dateLevel,
+          [currentKey]: updater(slotLevel),
+        }
+      };
+    });
+  }, [selectedAttendanceDate, currentKey, setAttendanceStore]);
 
-  const toggleAttendance = (id: number) => {
+  const toggleAttendance = (id: string | number) => {
     updateSlotAttendance((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleMarkAllPresent = () => {
+    const next: Record<string | number, boolean> = {};
+    currentRoster.forEach((s: any) => { next[s.id] = true; });
+    setAttendanceStore((prev) => {
+      const dateLevel = prev[selectedAttendanceDate] ?? {};
+      return {
+        ...prev,
+        [selectedAttendanceDate]: {
+          ...dateLevel,
+          [currentKey]: next
+        }
+      };
+    });
+  };
+
+  const handleMarkAllAbsent = () => {
+    const next: Record<string | number, boolean> = {};
+    currentRoster.forEach((s: any) => { next[s.id] = false; });
+    setAttendanceStore((prev) => {
+      const dateLevel = prev[selectedAttendanceDate] ?? {};
+      return {
+        ...prev,
+        [selectedAttendanceDate]: {
+          ...dateLevel,
+          [currentKey]: next
+        }
+      };
+    });
   };
 
   const handleSaveAttendance = async () => {
@@ -476,13 +629,12 @@ export default function TeacherPortalPage() {
     setAttendanceSaved(true);
     setTimeout(() => setAttendanceSaved(false), 3000);
     
-    // DB Push
-    const today = new Date().toISOString().split("T")[0];
-    const records = Object.entries(currentAttendance).map(([studentId, isPresent]) => {
+    const records = (currentRoster || []).map((s: any) => {
+      const isPresent = currentAttendance[s.id] !== false;
       return {
-        student_id: studentId,
-        class_id: activeSlot.classId,
-        date: today,
+        student_id: String(s.id),
+        class_id: safeActiveSlot.classId,
+        date: selectedAttendanceDate,
         status: isPresent ? 'Present' : 'Absent'
       };
     });
@@ -495,7 +647,7 @@ export default function TeacherPortalPage() {
 
   // Grades CRUD
   const handleAddOrEditGrade = async (grade: Omit<Grade, "id">) => {
-    if (!activeSlot) return;
+    if (!safeActiveSlot) return;
     const existing = gradesStore[currentKey] ?? [];
     
     // Find student ID from name for DB insertion
@@ -516,7 +668,7 @@ export default function TeacherPortalPage() {
       }).eq("id", editingGrade.id);
     } else {
       const { data: insertedData } = await supabase.from("grades").insert({
-        class_id: activeSlot.classId,
+        class_id: safeActiveSlot.classId,
         student_id: studentId,
         test: grade.test,
         subject: grade.subject,
@@ -540,7 +692,7 @@ export default function TeacherPortalPage() {
 
   // Assignments CRUD
   const handleAddOrEditAssignment = async (assignment: Omit<Assignment, "id" | "submitted">) => {
-    if (!activeSlot) return;
+    if (!safeActiveSlot) return;
     const existing = assignmentsStore[currentKey] ?? [];
     if (editingAssignment) {
       setAssignmentsStore((prev) => ({
@@ -555,8 +707,8 @@ export default function TeacherPortalPage() {
       }).eq("id", editingAssignment.id);
     } else {
       const { data: insertedData } = await supabase.from("assignments").insert({
-        class_id: activeSlot.classId,
-        subject: activeSlot.subject,
+        class_id: safeActiveSlot.classId,
+        subject: safeActiveSlot.subject,
         title: assignment.title,
         due_date: assignment.dueDate,
         total: assignment.total,
@@ -584,7 +736,7 @@ export default function TeacherPortalPage() {
 
   const handlePublishAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeSlot) return;
+    if (!safeActiveSlot) return;
     if (!announcementText.trim()) return;
     if (announcementText.length > 500) {
       setToast({
@@ -599,8 +751,8 @@ export default function TeacherPortalPage() {
     const { data: insertedData } = await supabase.from("announcements").insert({
       title: escapeHtml(announcementText.trim()),
       content: escapeHtml(announcementText.trim()),
-      class_id: activeSlot.classId,
-      subject: activeSlot.subject,
+      class_id: safeActiveSlot.classId,
+      subject: safeActiveSlot.subject,
       target: "Class"
     }).select().single();
 
@@ -609,8 +761,8 @@ export default function TeacherPortalPage() {
         id: insertedData.id,
         title: escapeHtml(announcementText.trim()),
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        classId: activeSlot.classId,
-        subject: activeSlot.subject,
+        classId: safeActiveSlot.classId,
+        subject: safeActiveSlot.subject,
       };
       
       setAnnouncementsStore((prev) => ({
@@ -640,14 +792,14 @@ export default function TeacherPortalPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Grades_${activeSlot.classId}_${activeSlot.subject}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `Grades_${safeActiveSlot.classId}_${safeActiveSlot.subject}_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
   // Derived values
   const presentCount  = currentRoster.filter((s) => currentAttendance[s.id] !== false).length;
   const classAvg      = currentGrades.length
-    ? Math.round(currentGrades.reduce((s, g) => s + (g.score / g.maxScore) * 100, 0) / currentGrades.length)
+    ? Math.round(currentGrades.reduce((s, g) => s + (g.maxScore > 0 ? (g.score / g.maxScore) * 100 : 0), 0) / currentGrades.length)
     : 0;
   const activeAssCount = currentAssignments.filter((a) => a.status === "Active").length;
 
@@ -659,10 +811,10 @@ export default function TeacherPortalPage() {
   // Shared context bar shown at top of every tab
   const ContextBar = () => (
     <div className="flex items-center gap-3 flex-wrap mb-6">
-      {activeSlot && (
+      {safeActiveSlot && (
         <ClassSelector
           slots={dynamicSlots}
-          activeSlot={activeSlot}
+          activeSlot={safeActiveSlot}
           onChange={(slot) => setActiveSlot(slot)}
         />
       )}
@@ -688,7 +840,6 @@ export default function TeacherPortalPage() {
           className="w-full max-w-md relative z-10"
         >
           <div className="bg-white rounded-3xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div className="h-1.5 bg-accent" />
             <div className="p-8 md:p-10">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 rounded-2xl bg-primary mx-auto mb-4 flex items-center justify-center shadow-lg shadow-secondary/20">
@@ -834,7 +985,7 @@ export default function TeacherPortalPage() {
         <div className="px-4 pt-4 pb-2 space-y-1.5">
           <p className="text-[9px] font-extrabold uppercase tracking-widest text-white/30 px-2 mb-2">My Classes</p>
           {currentTeacher.slots.map((slot) => {
-            const isActive = slot.classId === activeSlot.classId && slot.subject === activeSlot.subject;
+            const isActive = safeActiveSlot && slot.classId === safeActiveSlot.classId && slot.subject === safeActiveSlot.subject;
             return (
               <button
                 key={slotKey(slot.classId, slot.subject)}
@@ -890,8 +1041,20 @@ export default function TeacherPortalPage() {
           </button>
           <span className="text-white font-semibold text-sm">Teacher Dashboard</span>
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-bold text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">{activeSlot.classId}</span>
+        <div className="flex items-center gap-2.5 relative">
+          <span className="text-xs font-bold text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">{safeActiveSlot.classId}</span>
+          <button
+            onClick={() => setShowBellDropdown(!showBellDropdown)}
+            className="relative text-white/80 hover:text-white transition-colors cursor-pointer p-1"
+            aria-label="Broadcast Announcements"
+          >
+            <Bell size={20} />
+            {unreadBellCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center border border-primary">
+                {unreadBellCount}
+              </span>
+            )}
+          </button>
           <button onClick={handleSignOut} aria-label="Sign out" className="text-white/75 hover:text-white transition-colors cursor-pointer">
             <LogOut size={18} />
           </button>
@@ -928,7 +1091,7 @@ export default function TeacherPortalPage() {
               <div className="px-4 pt-4 pb-2 space-y-1.5">
                 <p className="text-[9px] font-extrabold uppercase tracking-widest text-white/30 px-2 mb-2">My Classes</p>
                 {currentTeacher.slots.map((slot) => {
-                  const isActive = slot.classId === activeSlot.classId && slot.subject === activeSlot.subject;
+                  const isActive = safeActiveSlot && slot.classId === safeActiveSlot.classId && slot.subject === safeActiveSlot.subject;
                   return (
                     <button
                       key={slotKey(slot.classId, slot.subject)}
@@ -985,18 +1148,104 @@ export default function TeacherPortalPage() {
         <div className="p-4 lg:p-8 max-w-5xl mx-auto">
 
           {/* Page Header */}
-          <div className="mb-6 border-b border-slate-200 pb-5">
-            <h1 className="text-2xl font-bold text-slate-800">Welcome, {currentTeacher.name}</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              {currentTeacher.slots.length} classes · {currentTeacher.slots.map(s => s.classId).join(", ")} ·{" "}
-              {new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-            </p>
+          <div className="mb-6 border-b border-slate-200 pb-5 flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">Welcome, {currentTeacher.name}</h1>
+              <p className="text-slate-500 text-sm mt-1">
+                {currentTeacher.slots.length} classes · {currentTeacher.slots.map(s => s.classId).join(", ")} ·{" "}
+                {new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            </div>
+
+            {/* Broadcast Bell Button & Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBellDropdown(!showBellDropdown)}
+                className="relative px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer shadow-xs flex items-center gap-2"
+                title="Faculty Broadcast Dispatches"
+              >
+                <Bell size={18} className="text-emerald-600" />
+                <span className="text-xs font-bold">Broadcast Notices</span>
+                {unreadBellCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center shadow-md animate-pulse">
+                    {unreadBellCount}
+                  </span>
+                )}
+              </button>
+
+              {showBellDropdown && (
+                <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <Bell size={16} />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-slate-800 text-sm">Faculty Broadcasts</h4>
+                        <p className="text-[10px] text-slate-400 font-semibold">{effectiveAnnouncements.length} Dispatches</p>
+                      </div>
+                    </div>
+                    {unreadBellCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[11px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                      >
+                        ✓ Mark read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {effectiveAnnouncements.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          if (!item.read) {
+                            setReadTeacherNoticeIds((prev) => Array.from(new Set([...prev, item.id])));
+                          }
+                        }}
+                        className={`p-3.5 border rounded-2xl space-y-1.5 transition-all cursor-pointer ${
+                          item.read ? "bg-slate-50 border-slate-100 opacity-75" : "bg-emerald-50/40 border-emerald-200/60 shadow-2xs"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                            item.priority === "High" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          }`}>
+                            {item.priority === "High" ? "🔥 High Priority" : "📢 Notice"}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">{item.date}</span>
+                        </div>
+                        <h5 className="text-xs font-extrabold text-slate-800 leading-snug">{item.title}</h5>
+                        <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{item.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <AnimatePresence mode="wait">
-
-            {/* ── DASHBOARD ── */}
-            {activeTab === "dashboard" && (
+            {isLoadingData ? (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-200" />
+                    <div className="space-y-2">
+                      <div className="w-48 h-5 rounded-lg bg-slate-200" />
+                      <div className="w-32 h-3.5 rounded-lg bg-slate-100" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                  </div>
+                </div>
+              </motion.div>
+            ) : activeTab === "dashboard" && (
               <motion.div key="dashboard" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
                 <ContextBar />
 
@@ -1024,7 +1273,7 @@ export default function TeacherPortalPage() {
                   {/* Attendance widget */}
                   <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                      <h3 className="font-bold text-slate-800 text-sm">Today&apos;s Roll Call · {activeSlot.classId}</h3>
+                      <h3 className="font-bold text-slate-800 text-sm">Today&apos;s Roll Call · {safeActiveSlot.classId}</h3>
                       <button onClick={() => setActiveTab("attendance")} className="text-xs text-accent font-bold hover:underline cursor-pointer">Full Attendance →</button>
                     </div>
                     <div className="p-4 max-h-[280px] overflow-y-auto divide-y divide-slate-100">
@@ -1045,7 +1294,7 @@ export default function TeacherPortalPage() {
                   {/* Grades widget */}
                   <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                     <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                      <h3 className="font-bold text-slate-800 text-sm">Recent Scores · {activeSlot.subject}</h3>
+                      <h3 className="font-bold text-slate-800 text-sm">Recent Scores · {safeActiveSlot.subject}</h3>
                       <button onClick={() => setActiveTab("grades")} className="text-xs text-accent font-bold hover:underline cursor-pointer">Gradebook →</button>
                     </div>
                     <div className="p-4">
@@ -1087,9 +1336,9 @@ export default function TeacherPortalPage() {
                     {dynamicSlots.map((slot) => {
                       const key = slotKey(slot.classId, slot.subject);
                       const roster = dynamicRosters[slot.classId] ?? [];
-                      const att = attendanceStore[key] ?? {};
+                      const att = dateAttendanceStore[key] ?? {};
                       const present = roster.filter((s) => att[s.id] !== false).length;
-                      const isSelected = activeSlot && slot.classId === activeSlot.classId && slot.subject === activeSlot.subject;
+                      const isSelected = safeActiveSlot && slot.classId === safeActiveSlot.classId && slot.subject === safeActiveSlot.subject;
                       return (
                         <button
                           key={key}
@@ -1121,15 +1370,53 @@ export default function TeacherPortalPage() {
                 <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
                   <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-base">Roll Call — {activeSlot.classId} · {activeSlot.subject}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Toggle student present/absent status</p>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-800 text-base">
+                          {safeActiveSlot.isClassTeacher ? "⭐ Official Daily Attendance Roll Call" : "Subject Roll Call"} — {safeActiveSlot.classId}
+                        </h3>
+                        {safeActiveSlot.isClassTeacher && (
+                          <span className="px-2.5 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-black uppercase tracking-wider rounded-md">
+                            ⭐ Class Teacher Mode
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                        {safeActiveSlot.isClassTeacher
+                          ? `As Class Teacher of ${safeActiveSlot.classId}, your daily morning roll call logs the official attendance for school records & parents.`
+                          : `Subject period attendance for ${safeActiveSlot.subject}.`}
+                      </p>
                     </div>
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 shadow-2xs">
+                        <Calendar size={14} className="text-emerald-600" />
+                        <span>Date:</span>
+                        <input
+                          type="date"
+                          value={selectedAttendanceDate}
+                          onChange={(e) => setSelectedAttendanceDate(e.target.value)}
+                          className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleMarkAllPresent}
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200 transition-all cursor-pointer"
+                        title="Mark all students in roster as Present"
+                      >
+                        ✓ Mark All Present
+                      </button>
+                      <button
+                        onClick={handleMarkAllAbsent}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-all cursor-pointer"
+                        title="Mark all students in roster as Absent"
+                      >
+                        ✕ Mark All Absent
+                      </button>
                       <span className="text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
                         Present: {presentCount} / {currentRoster.length}
                       </span>
                       <button onClick={handleSaveAttendance}
-                        className="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-light transition-all cursor-pointer">
+                        className="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-light transition-all cursor-pointer shadow-sm">
                         Submit Record
                       </button>
                     </div>

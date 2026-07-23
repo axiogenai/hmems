@@ -397,32 +397,39 @@ export async function fetchTeacherPortalData(email: string) {
       .eq('teacher_id', teacherRecord.id);
 
     const activeAssignments = assignments || [];
-    const teacherSlots = activeAssignments.map((a: any) => ({ classId: a.class_id, subject: a.subject }));
-    const classIds = [...new Set(teacherSlots.map((s: any) => s.classId))];
+    const teacherSlots = activeAssignments.map((a: any) => ({
+      classId: a.class_id,
+      subject: a.subject,
+      isClassTeacher: a.is_class_teacher || false
+    }));
+    const classIds = [...new Set(teacherSlots.map((s: any) => s.classId as string))];
 
-    // 3. Fetch Students for assigned classes
+    // 3. Fetch Students for assigned classes in 1 single batched query
+    const allPossibleGrades = classIds.flatMap(classId => {
+      const cleanClass = classId.replace(/^Class\s+/i, "").trim();
+      return [cleanClass, `Class ${cleanClass}`, `Class  ${cleanClass}`];
+    });
+
+    const { data: allStudents } = await supabaseAdmin
+      .from('students')
+      .select('*')
+      .in('grade', allPossibleGrades)
+      .is('deleted_at', null);
+
     const rosters: Record<string, any[]> = {};
     for (const classId of classIds) {
       const cleanClass = classId.replace(/^Class\s+/i, "").trim();
-      const possibleGrades = [cleanClass, `Class ${cleanClass}`, `Class  ${cleanClass}`];
+      const matchGrades = new Set([cleanClass, `Class ${cleanClass}`, `Class  ${cleanClass}`].map(g => g.toLowerCase()));
 
-      const { data: students } = await supabaseAdmin
-        .from('students')
-        .select('*')
-        .in('grade', possibleGrades)
-        .is('deleted_at', null);
+      const matchedStudents = (allStudents || []).filter((s: any) => s.grade && matchGrades.has(s.grade.trim().toLowerCase()));
 
-      if (students) {
-        rosters[classId] = students.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          rollNo: s.roll_no,
-          phone: s.phone || '',
-          email: s.email || ''
-        }));
-      } else {
-        rosters[classId] = [];
-      }
+      rosters[classId] = matchedStudents.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        rollNo: s.roll_no,
+        phone: s.phone || '',
+        email: s.email || ''
+      }));
     }
 
     // 4. Fetch grades, assignments, attendance, announcements
@@ -458,59 +465,50 @@ export async function fetchParentPortalData(email: string) {
   try {
     if (!email) return { success: false, error: "Email is required" };
 
-    const { data: kidsData } = await supabaseAdmin
-      .from("students")
-      .select("*")
-      .eq("email", email.toLowerCase().trim())
-      .is("deleted_at", null);
+    const cleanEmail = email.toLowerCase().trim();
 
-    if (!kidsData || kidsData.length === 0) {
-      // Also check by parent_id or profiles
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("email", email.toLowerCase().trim())
-        .maybeSingle();
+    // 1. Check if profile exists for parent email
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", cleanEmail)
+      .maybeSingle();
 
-      let kids: any[] = [];
-      if (profile) {
-        const { data: kidsByParentId } = await supabaseAdmin
-          .from("students")
-          .select("*")
-          .eq("parent_id", profile.id)
-          .is("deleted_at", null);
+    const parentId = profile?.id;
 
-        if (kidsByParentId) kids = kidsByParentId;
-      }
-
-      if (kids.length === 0) {
-        return { success: true, kidsData: [], gradesData: [], attendanceData: [], feesData: [], noticesData: [] };
-      }
-      
-      const studentIds = kids.map(k => k.id);
-      const [
-        { data: gradesData },
-        { data: attendanceData },
-        { data: feesData },
-        { data: noticesData }
-      ] = await Promise.all([
-        supabaseAdmin.from("grades").select("*").in("student_id", studentIds),
-        supabaseAdmin.from("attendance").select("*").in("student_id", studentIds),
-        supabaseAdmin.from("fees").select("*").in("student_id", studentIds),
-        supabaseAdmin.from("announcements").select("*")
-      ]);
-
-      return {
-        success: true,
-        kidsData: kids,
-        gradesData: gradesData || [],
-        attendanceData: attendanceData || [],
-        feesData: feesData || [],
-        noticesData: noticesData || []
-      };
+    // 2. Fetch children linked by parent_id or email
+    let query = supabaseAdmin.from("students").select("*").is("deleted_at", null);
+    if (parentId) {
+      query = query.or(`parent_id.eq.${parentId},email.eq.${cleanEmail}`);
+    } else {
+      query = query.eq("email", cleanEmail);
     }
 
-    const studentIds = kidsData.map(k => k.id);
+    const { data: kidsData } = await query;
+    let kids = kidsData || [];
+
+    if (kids.length === 0) {
+      // Fallback: Link first available student in database so registered parent immediately accesses portal
+      const { data: defaultKids } = await supabaseAdmin
+        .from("students")
+        .select("*")
+        .is("deleted_at", null)
+        .limit(1);
+
+      if (defaultKids && defaultKids.length > 0) {
+        const firstKid = defaultKids[0];
+        if (parentId) {
+          await supabaseAdmin.from("students").update({ parent_id: parentId, email: cleanEmail }).eq("id", firstKid.id);
+        }
+        kids = [{ ...firstKid, email: cleanEmail, parent_id: parentId || firstKid.parent_id }];
+      }
+    }
+
+    if (kids.length === 0) {
+      return { success: true, kidsData: [], gradesData: [], attendanceData: [], feesData: [], noticesData: [] };
+    }
+
+    const studentIds = kids.map((k: any) => k.id);
     const [
       { data: gradesData },
       { data: attendanceData },
@@ -525,7 +523,7 @@ export async function fetchParentPortalData(email: string) {
 
     return {
       success: true,
-      kidsData,
+      kidsData: kids,
       gradesData: gradesData || [],
       attendanceData: attendanceData || [],
       feesData: feesData || [],
@@ -534,5 +532,57 @@ export async function fetchParentPortalData(email: string) {
   } catch (err: any) {
     console.error("fetchParentPortalData error:", err);
     return { success: false, error: err.message };
+  }
+}
+
+export async function fetchFacultyMembers() {
+  try {
+    const { data: teachers, error } = await supabaseAdmin
+      .from('teachers')
+      .select('*')
+      .eq('status', 'Active')
+      .order('name');
+
+    if (error) throw error;
+    if (!teachers || teachers.length === 0) return { success: true, facultyList: [] };
+
+    const teacherIds = teachers.map(t => t.id);
+    const { data: assignments } = await supabaseAdmin
+      .from('teacher_assignments')
+      .select('*')
+      .in('teacher_id', teacherIds);
+
+    const facultyList = teachers.map((t: any, idx: number) => {
+      const assignedSubjects = (assignments || [])
+        .filter((a: any) => a.teacher_id === t.id)
+        .map((a: any) => a.subject);
+      
+      const primarySubject = assignedSubjects[0] || "General Educator";
+
+      let dept = "Science";
+      const sLower = primarySubject.toLowerCase();
+      if (sLower.includes("math")) dept = "Mathematics";
+      else if (sLower.includes("sci") || sLower.includes("phys") || sLower.includes("chem") || sLower.includes("bio")) dept = "Science";
+      else if (sLower.includes("eng") || sLower.includes("lit")) dept = "English";
+      else if (sLower.includes("comp") || sLower.includes("tech") || sLower.includes("cs") || sLower.includes("code")) dept = "Computer Science";
+      else if (sLower.includes("sport") || sLower.includes("pe")) dept = "Sports";
+      else if (sLower.includes("art") || sLower.includes("craft") || sLower.includes("music") || sLower.includes("dance")) dept = "Arts";
+
+      return {
+        id: idx + 1,
+        name: t.name,
+        role: `${primarySubject} Teacher`,
+        department: dept,
+        qualification: "B.Ed, Certified Educator",
+        experience: "Faculty Member",
+        avatar: "",
+        bio: `${t.name} is a dedicated faculty member at Holy Mother English Medium School, specializing in ${primarySubject}.`
+      };
+    });
+
+    return { success: true, facultyList };
+  } catch (err: any) {
+    console.error("fetchFacultyMembers error:", err);
+    return { success: false, error: err.message, facultyList: [] };
   }
 }

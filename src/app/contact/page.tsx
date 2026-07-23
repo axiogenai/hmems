@@ -60,19 +60,94 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: "" });
+  const validateField = (name: string, value: string) => {
+    let errorMsg = "";
+    const cleanVal = value.trim();
+
+    if (name === "name") {
+      if (!cleanVal || cleanVal.length < 3) {
+        errorMsg = "Please enter your full name (at least 3 characters)";
+      } else if (!/^[a-zA-Z\s'.]+$/.test(cleanVal)) {
+        errorMsg = "Full Name must contain letters only (no symbols or numbers)";
+      }
+    } else if (name === "email") {
+      if (!cleanVal || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanVal)) {
+        errorMsg = "Please enter a valid email address (e.g. parent@gmail.com)";
+      }
+    } else if (name === "phone") {
+      if (cleanVal) {
+        const digitsOnly = cleanVal.replace(/[\s+.-]/g, "");
+        if (!/^\d{10,12}$/.test(digitsOnly) || /[a-zA-Z]/.test(cleanVal)) {
+          errorMsg = "Please enter a valid 10-digit phone number (numbers only)";
+        }
+      }
+    } else if (name === "subject") {
+      if (!value) {
+        errorMsg = "Please select an inquiry subject from the list";
+      }
+    } else if (name === "message") {
+      if (!cleanVal || cleanVal.length < 10) {
+        errorMsg = "Message must be at least 10 characters long";
+      }
+    }
+
+    setErrors(prev => ({ ...prev, [name]: errorMsg }));
+    return !errorMsg;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
+    // Strict input filtering: Phone number only accepts numeric digits, +, -
+    if (name === "phone" && value && !/^[\d\s+-]*$/.test(value)) {
+      setErrors(prev => ({ ...prev, phone: "Phone number accepts numeric digits only" }));
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [name]: value }));
+    validateField(name, value);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    validateField(e.target.name, e.target.value);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = "Required";
-    if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Valid email required";
-    if (!formData.message.trim()) newErrors.message = "Please enter a message";
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    setSubmitted(true);
+    
+    // Validate all fields on submit
+    const isNameValid = validateField("name", formData.name);
+    const isEmailValid = validateField("email", formData.email);
+    const isPhoneValid = validateField("phone", formData.phone);
+    const isSubjectValid = validateField("subject", formData.subject);
+    const isMessageValid = validateField("message", formData.message);
+
+    if (!isNameValid || !isEmailValid || !isPhoneValid || !isSubjectValid || !isMessageValid) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      await supabase.from("applications").insert({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || "N/A",
+        grade: "Contact Inquiry",
+        parent_name: formData.name,
+        parent_phone: formData.phone || "N/A",
+        parent_email: formData.email,
+        notes: `Subject: ${formData.subject || 'General Inquiry'}. Message: ${formData.message}`,
+        status: "Pending"
+      });
+    } catch (err) {
+      console.error("Contact form Supabase error:", err);
+    } finally {
+      setIsSubmitting(false);
+      setSubmitted(true);
+    }
   };
 
   return (
@@ -177,11 +252,12 @@ export default function ContactPage() {
                         placeholder="Full Name"
                         value={formData.name}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-slate-50/50 hover:bg-slate-50 text-slate-800 transition-all placeholder-slate-400 ${
-                          errors.name ? "border-destructive focus:ring-destructive/20 bg-red-50/10" : "border-border focus:ring-accent/30 focus:border-accent"
+                          errors.name ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" : "border-border focus:ring-accent/30 focus:border-accent"
                         }`}
                       />
-                      {errors.name && <p className="text-xs text-destructive mt-1 font-medium">{errors.name}</p>}
+                      {errors.name && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.name}</p>}
                     </div>
 
                     <div>
@@ -193,11 +269,12 @@ export default function ContactPage() {
                         placeholder="you@email.com"
                         value={formData.email}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-slate-50/50 hover:bg-slate-50 text-slate-800 transition-all placeholder-slate-400 ${
-                          errors.email ? "border-destructive focus:ring-destructive/20 bg-red-50/10" : "border-border focus:ring-accent/30 focus:border-accent"
+                          errors.email ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" : "border-border focus:ring-accent/30 focus:border-accent"
                         }`}
                       />
-                      {errors.email && <p className="text-xs text-destructive mt-1 font-medium">{errors.email}</p>}
+                      {errors.email && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.email}</p>}
                     </div>
 
                     <div>
@@ -209,25 +286,30 @@ export default function ContactPage() {
                         placeholder="+91 XXXXX XXXXX"
                         value={formData.phone}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-slate-50/50 hover:bg-slate-50 text-slate-800 transition-all placeholder-slate-400 ${
-                          errors.phone ? "border-destructive focus:ring-destructive/20 bg-red-50/10" : "border-border focus:ring-accent/30 focus:border-accent"
+                          errors.phone ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" : "border-border focus:ring-accent/30 focus:border-accent"
                         }`}
                       />
-                      {errors.phone && <p className="text-xs text-destructive mt-1 font-medium">{errors.phone}</p>}
+                      {errors.phone && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.phone}</p>}
                     </div>
 
                     <div>
-                      <label htmlFor="subject" className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Subject</label>
+                      <label htmlFor="subject" className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Subject *</label>
                       <select
                         id="subject"
                         name="subject"
                         value={formData.subject}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 text-slate-800 transition-all"
+                        onBlur={handleBlur}
+                        className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-slate-50/50 hover:bg-slate-50 text-slate-800 transition-all ${
+                          errors.subject ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" : "border-border focus:ring-accent/30 focus:border-accent"
+                        }`}
                       >
                         <option value="">Select a subject</option>
                         {subjectOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
+                      {errors.subject && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.subject}</p>}
                     </div>
 
                     <div>
@@ -238,20 +320,28 @@ export default function ContactPage() {
                         placeholder="How can we help you?"
                         value={formData.message}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         rows={4}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-slate-50/50 hover:bg-slate-50 text-slate-800 resize-none transition-all placeholder-slate-400 ${
-                          errors.message ? "border-destructive focus:ring-destructive/20 bg-red-50/10" : "border-border focus:ring-accent/30 focus:border-accent"
+                          errors.message ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" : "border-border focus:ring-accent/30 focus:border-accent"
                         }`}
                       />
-                      {errors.message && <p className="text-xs text-destructive mt-1 font-medium">{errors.message}</p>}
+                      {errors.message && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.message}</p>}
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
+                      disabled={isSubmitting}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-light text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Send size={16} />
-                      Send Message
+                      {isSubmitting ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          Send Message
+                        </>
+                      )}
                     </button>
                   </form>
                 )}

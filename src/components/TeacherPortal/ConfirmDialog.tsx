@@ -1,6 +1,5 @@
-"use client";
-
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Trash2, LogOut, X, Check } from "lucide-react";
 
@@ -27,7 +26,12 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const [mounted, setMounted] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -50,10 +54,12 @@ export function ConfirmDialog({
 
   const Icon = variant === "danger" ? Trash2 : variant === "warning" ? LogOut : variant === "success" ? Check : AlertTriangle;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -115,6 +121,7 @@ export function ConfirmDialog({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

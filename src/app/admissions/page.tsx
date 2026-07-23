@@ -91,29 +91,90 @@ export default function AdmissionsPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const validateField = (name: string, value: string) => {
+    let errorMsg = "";
+    const cleanVal = value.trim();
+
+    if (name === "parentName") {
+      if (!cleanVal || cleanVal.length < 3) {
+        errorMsg = "Please enter parent's full name (at least 3 characters)";
+      } else if (!/^[a-zA-Z\s'.]+$/.test(cleanVal)) {
+        errorMsg = "Parent name must contain letters only";
+      }
+    } else if (name === "childName") {
+      if (!cleanVal || cleanVal.length < 2) {
+        errorMsg = "Please enter student's full name";
+      } else if (!/^[a-zA-Z\s'.]+$/.test(cleanVal)) {
+        errorMsg = "Student name must contain letters only";
+      }
+    } else if (name === "email") {
+      if (!cleanVal || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanVal)) {
+        errorMsg = "Please enter a valid email address (e.g. parent@gmail.com)";
+      }
+    } else if (name === "phone") {
+      const digitsOnly = cleanVal.replace(/[\s+.-]/g, "");
+      if (!cleanVal || !/^\d{10,12}$/.test(digitsOnly) || /[a-zA-Z]/.test(cleanVal)) {
+        errorMsg = "Please enter a valid 10-digit phone number (numbers only)";
+      }
+    } else if (name === "grade") {
+      if (!value) {
+        errorMsg = "Please select target grade for admission";
+      }
+    }
+
+    setErrors(prev => ({ ...prev, [name]: errorMsg }));
+    return !errorMsg;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: "" });
-  };
+    const { name, value } = e.target;
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.parentName.trim()) newErrors.parentName = "Required";
-    if (!formData.phone.trim() || !/^\+?[\d\s-]{10,}$/.test(formData.phone)) newErrors.phone = "Valid phone number required";
-    if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Valid email required";
-    if (!formData.childName.trim()) newErrors.childName = "Required";
-    if (!formData.grade) newErrors.grade = "Please select a grade";
-    return newErrors;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors = validate();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    if (name === "phone" && value && !/^[\d\s+-]*$/.test(value)) {
+      setErrors(prev => ({ ...prev, phone: "Phone number accepts numeric digits only" }));
       return;
     }
-    setSubmitted(true);
+
+    setFormData(prev => ({ ...prev, [name]: value }));
+    validateField(name, value);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    validateField(e.target.name, e.target.value);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isParentValid = validateField("parentName", formData.parentName);
+    const isChildValid = validateField("childName", formData.childName);
+    const isEmailValid = validateField("email", formData.email);
+    const isPhoneValid = validateField("phone", formData.phone);
+    const isGradeValid = validateField("grade", formData.grade);
+
+    if (!isParentValid || !isChildValid || !isEmailValid || !isPhoneValid || !isGradeValid) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      await supabase.from("applications").insert({
+        name: formData.childName,
+        email: formData.email,
+        phone: formData.phone,
+        grade: formData.grade,
+        parent_name: formData.parentName,
+        parent_phone: formData.phone,
+        parent_email: formData.email,
+        notes: formData.message ? `Previous School: ${formData.prevSchool || 'N/A'}. Note: ${formData.message}` : `Previous School: ${formData.prevSchool || 'N/A'}`,
+        status: "Pending"
+      });
+    } catch (err) {
+      console.error("Admissions inquiry submission error:", err);
+    } finally {
+      setIsSubmitting(false);
+      setSubmitted(true);
+    }
   };
 
   return (
@@ -271,13 +332,14 @@ export default function AdmissionsPage() {
                         placeholder="Full Name"
                         value={formData.parentName}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all ${
                           errors.parentName
-                            ? "border-destructive focus:ring-destructive/20 bg-red-50/10"
+                            ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30"
                             : "border-border focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50"
                         } text-slate-800 placeholder-slate-400`}
                       />
-                      {errors.parentName && <p className="text-xs text-destructive mt-1 font-medium">{errors.parentName}</p>}
+                      {errors.parentName && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.parentName}</p>}
                     </div>
 
                     <div>
@@ -289,13 +351,14 @@ export default function AdmissionsPage() {
                         placeholder="+91 XXXXX XXXXX"
                         value={formData.phone}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all ${
                           errors.phone
-                            ? "border-destructive focus:ring-destructive/20 bg-red-50/10"
+                            ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30"
                             : "border-border focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50"
                         } text-slate-800 placeholder-slate-400`}
                       />
-                      {errors.phone && <p className="text-xs text-destructive mt-1 font-medium">{errors.phone}</p>}
+                      {errors.phone && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.phone}</p>}
                     </div>
 
                     <div>
@@ -307,13 +370,14 @@ export default function AdmissionsPage() {
                         placeholder="parent@email.com"
                         value={formData.email}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all ${
                           errors.email
-                            ? "border-destructive focus:ring-destructive/20 bg-red-50/10"
+                            ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30"
                             : "border-border focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50"
                         } text-slate-800 placeholder-slate-400`}
                       />
-                      {errors.email && <p className="text-xs text-destructive mt-1 font-medium">{errors.email}</p>}
+                      {errors.email && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.email}</p>}
                     </div>
 
                     <div>
@@ -325,13 +389,14 @@ export default function AdmissionsPage() {
                         placeholder="Full Name"
                         value={formData.childName}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all ${
                           errors.childName
-                            ? "border-destructive focus:ring-destructive/20 bg-red-50/10"
+                            ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30"
                             : "border-border focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50"
                         } text-slate-800 placeholder-slate-400`}
                       />
-                      {errors.childName && <p className="text-xs text-destructive mt-1 font-medium">{errors.childName}</p>}
+                      {errors.childName && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.childName}</p>}
                     </div>
 
                     <div>
@@ -342,6 +407,7 @@ export default function AdmissionsPage() {
                         name="dob"
                         value={formData.dob}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 text-slate-800"
                       />
                     </div>
@@ -355,6 +421,7 @@ export default function AdmissionsPage() {
                         placeholder="School Name (if any)"
                         value={formData.prevSchool}
                         onChange={handleChange}
+                        onBlur={handleBlur}
                         className="w-full px-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50 text-slate-800 placeholder-slate-400"
                       />
                     </div>
@@ -367,9 +434,10 @@ export default function AdmissionsPage() {
                       name="grade"
                       value={formData.grade}
                       onChange={handleChange}
+                      onBlur={handleBlur}
                       className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 transition-all text-slate-800 ${
                         errors.grade 
-                          ? "border-destructive focus:ring-destructive/20 bg-red-50/10" 
+                          ? "border-rose-500 focus:ring-rose-500/20 bg-rose-50/30" 
                           : "border-border focus:ring-accent/30 focus:border-accent bg-slate-50/50 hover:bg-slate-50"
                       }`}
                     >
@@ -378,7 +446,7 @@ export default function AdmissionsPage() {
                         <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
-                    {errors.grade && <p className="text-xs text-destructive mt-1 font-medium">{errors.grade}</p>}
+                    {errors.grade && <p className="text-xs text-rose-600 mt-1 font-bold flex items-center gap-1">⚠️ {errors.grade}</p>}
                   </div>
                   {/* Message */}
                   <div>

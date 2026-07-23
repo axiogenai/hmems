@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Phone, Mail, GraduationCap, LogIn } from "lucide-react";
+import { Menu, X, Phone, Mail, GraduationCap, LogIn, Sparkles } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 
 const navLinks = [
@@ -72,8 +72,8 @@ export function Navbar() {
             </div>
             <div className="hidden sm:block">
               <p className="text-sm xl:text-base font-extrabold text-primary leading-tight tracking-tight">
-                <span className="hidden xl:inline">Holy Mother School</span>
-                <span className="inline xl:hidden">{siteConfig.shortName}</span>
+                <span className="hidden sm:inline">{siteConfig.schoolName}</span>
+                <span className="inline sm:hidden">{siteConfig.shortName}</span>
               </p>
               <p className="text-[9px] xl:text-[10px] text-muted font-bold uppercase tracking-wider">{siteConfig.affiliationBoard} Affiliated</p>
             </div>

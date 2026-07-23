@@ -51,13 +51,17 @@ const eventCategoryColors: Record<string, string> = {
   National: "bg-slate-100 text-slate-700 border border-slate-200",
 };
 
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+
 export default function StudentLifePage() {
+  const [gallery] = useLocalStorage("cms_cultural_gallery", galleryImages);
+  const [eventList] = useLocalStorage("cms_school_events", events);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
   const filteredImages = activeCategory === "All"
-    ? galleryImages
-    : galleryImages.filter((img) => img.category === activeCategory);
+    ? gallery
+    : gallery.filter((img: any) => img.category === activeCategory);
 
   return (
     <div>

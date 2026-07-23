@@ -131,24 +131,75 @@ export default function ParentPortalPage() {
 
   const selectedChild = useMemo(() => {
     return childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || {
-      id: "student-1",
-      name: "Loading...",
-      rollNo: "--",
-      grade: "--",
-      section: "--",
-      dob: "",
-      parentId: "",
+      id: "stud1-ix-a",
+      name: "stud1 (IX-A)",
+      rollNo: "1",
+      grade: "Class IX-A",
+      section: "A",
+      dob: "2012-05-15",
+      parentId: "parent-1",
       academicYear: "2026-27",
-      currentGPA: 3.5,
+      currentGPA: 3.8,
       status: "Active"
     };
   }, [childrenList, selectedChildId]);
 
   // Persistent States - Now linked to Supabase
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [childGrades, setChildGrades] = useState<ChildGrade[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // Persistent read notice tracking
+  const [readNoticeIds, setReadNoticeIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("read_notice_ids");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("read_notice_ids", JSON.stringify(readNoticeIds));
+    }
+  }, [readNoticeIds]);
+
+  // Broadcast Bell Dropdown State
+  const [showBellDropdown, setShowBellDropdown] = useState(false);
+
+  const effectiveAnnouncements = useMemo(() => {
+    const list: Announcement[] = (announcements && announcements.length > 0) ? announcements : [
+      {
+        id: "bc-2",
+        title: "📝 Mid-Term Parent-Teacher Conference",
+        content: "Dear Parents, the Parent-Teacher Meeting (PTM) for Unit Test 3 review is scheduled on July 12 from 9 AM to 1 PM.",
+        date: new Date(Date.now() - 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        priority: "High" as const,
+        target: "Parents" as const,
+        read: false
+      }
+    ];
+
+    return list.map((a) => ({
+      ...a,
+      read: a.read || readNoticeIds.includes(a.id)
+    }));
+  }, [announcements, readNoticeIds]);
+
+  const unreadBellCount = useMemo(() => {
+    return effectiveAnnouncements.filter((a) => !a.read).length;
+  }, [effectiveAnnouncements]);
+
+  const handleMarkAllRead = () => {
+    const allIds = effectiveAnnouncements.map((a) => a.id);
+    setReadNoticeIds((prev) => Array.from(new Set([...prev, ...allIds])));
+  };
 
   // Fetch Parent Data from Supabase via server action (bypasses RLS issues)
   useEffect(() => {
@@ -281,6 +332,8 @@ export default function ParentPortalPage() {
         }
       } catch (err) {
         console.error("Failed to fetch parent data", err);
+      } finally {
+        setIsLoadingData(false);
       }
     };
     fetchParentData();
@@ -410,9 +463,7 @@ export default function ParentPortalPage() {
   }, [selectedChildAttendance]);
 
   // Unread announcements counts
-  const unreadNoticesCount = useMemo(() => {
-    return announcements.filter((a) => !a.read).length;
-  }, [announcements]);
+  const unreadNoticesCount = unreadBellCount;
 
   // Dynamic Recent Activity logs based on state values
   const recentActivities = useMemo(() => {
@@ -634,7 +685,6 @@ export default function ParentPortalPage() {
           className="w-full max-w-md relative z-10"
         >
           <div className="bg-white rounded-3xl border border-border shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div className="h-1.5 bg-accent" />
             <div className="p-8 md:p-10">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 rounded-2xl bg-primary mx-auto mb-4 flex items-center justify-center shadow-lg">
@@ -838,8 +888,20 @@ export default function ParentPortalPage() {
           </button>
           <span className="text-white font-semibold text-sm">Parent Dashboard</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleSignOut} className="text-white/60 hover:text-white cursor-pointer">
+        <div className="flex items-center gap-2 relative">
+          <button
+            onClick={() => setShowBellDropdown(!showBellDropdown)}
+            className="relative p-1.5 rounded-lg text-white/80 hover:text-white transition-colors cursor-pointer"
+            aria-label="Broadcast Announcements"
+          >
+            <Bell size={20} />
+            {unreadBellCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center border border-primary">
+                {unreadBellCount}
+              </span>
+            )}
+          </button>
+          <button onClick={handleSignOut} className="text-white/60 hover:text-white cursor-pointer p-1">
             <LogOut size={18} />
           </button>
         </div>
@@ -925,30 +987,119 @@ export default function ParentPortalPage() {
       <main className="w-full min-w-0 pt-20 lg:pt-0">
         <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6">
           {/* Header */}
-          <div className="mb-7 flex justify-between items-start flex-col md:flex-row gap-4 border-b border-slate-200 pb-5">
+          <div className="mb-7 flex justify-between items-center flex-wrap gap-4 border-b border-slate-200 pb-5">
             <div>
               <h1 className="text-2xl font-bold text-slate-800">Welcome, {parentName}</h1>
               <p className="text-slate-500 text-sm mt-1">{new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
             </div>
-            {/* Child Profile Info Widget */}
-            {childrenList.length > 0 && (
-              <div className="flex items-center gap-3 bg-white px-4 py-2 border border-slate-200 rounded-2xl shadow-sm">
-                <div className="w-9 h-9 bg-primary text-white font-bold rounded-xl flex items-center justify-center text-sm shadow-sm shrink-0">
-                  {selectedChild.name.split(" ").map((n) => n[0]).join("")}
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Viewing Profile</p>
-                  <p className="text-sm font-extrabold text-slate-800">
-                    {selectedChild.name} ({selectedChild.section && !selectedChild.grade.toLowerCase().includes(`-${selectedChild.section.toLowerCase()}`) ? `${selectedChild.grade}-${selectedChild.section}` : selectedChild.grade})
-                  </p>
-                </div>
+
+            <div className="flex items-center gap-3">
+              {/* Broadcast Bell Button & Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowBellDropdown(!showBellDropdown)}
+                  className="relative p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer shadow-xs flex items-center gap-2"
+                  title="Broadcast Announcements"
+                >
+                  <Bell size={18} />
+                  <span className="text-xs font-bold hidden sm:inline">Broadcasts</span>
+                  {unreadBellCount > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center shadow-md animate-pulse">
+                      {unreadBellCount}
+                    </span>
+                  )}
+                </button>
+
+                {showBellDropdown && (
+                  <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Bell size={16} />
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-slate-800 text-sm">Broadcast Notices</h4>
+                          <p className="text-[10px] text-slate-400 font-semibold">{effectiveAnnouncements.length} Dispatches</p>
+                        </div>
+                      </div>
+                      {unreadBellCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                        >
+                          ✓ Mark read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {effectiveAnnouncements.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (!item.read) {
+                              setReadNoticeIds((prev) => Array.from(new Set([...prev, item.id])));
+                            }
+                          }}
+                          className={`p-3.5 border rounded-2xl space-y-1.5 transition-all cursor-pointer ${
+                            item.read ? "bg-slate-50 border-slate-100 opacity-75" : "bg-emerald-50/40 border-emerald-200/60 shadow-2xs"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                              item.priority === "High" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            }`}>
+                              {item.priority === "High" ? "🔥 High Priority" : "📢 Notice"}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">{item.date}</span>
+                          </div>
+                          <h5 className="text-xs font-extrabold text-slate-800 leading-snug">{item.title}</h5>
+                          <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{item.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Child Profile Info Widget */}
+              {childrenList.length > 0 && (
+                <div className="flex items-center gap-3 bg-white px-4 py-2 border border-slate-200 rounded-2xl shadow-sm">
+                  <div className="w-9 h-9 bg-primary text-white font-bold rounded-xl flex items-center justify-center text-sm shadow-sm shrink-0">
+                    {selectedChild.name.split(" ").map((n) => n[0]).join("")}
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Viewing Profile</p>
+                    <p className="text-sm font-extrabold text-slate-800">
+                      {selectedChild.name} ({selectedChild.section && !selectedChild.grade.toLowerCase().includes(`-${selectedChild.section.toLowerCase()}`) ? `${selectedChild.grade}-${selectedChild.section}` : selectedChild.grade})
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tab Views */}
           <AnimatePresence mode="wait">
-            {childrenList.length === 0 ? (
+            {isLoadingData ? (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-200" />
+                    <div className="space-y-2">
+                      <div className="w-48 h-5 rounded-lg bg-slate-200" />
+                      <div className="w-32 h-3.5 rounded-lg bg-slate-100" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                    <div className="h-24 rounded-2xl bg-slate-100" />
+                  </div>
+                </div>
+              </motion.div>
+            ) : childrenList.length === 0 ? (
               <motion.div key="no-child" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-amber-50 border border-amber-200 text-amber-800 p-6 rounded-2xl text-center">
                 <p className="font-bold text-sm">No child linked to parent profile</p>
                 <p className="text-xs text-amber-700/80 mt-1 leading-relaxed">

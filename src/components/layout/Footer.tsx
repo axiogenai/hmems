@@ -68,29 +68,29 @@ export function Footer() {
       {/* Top gold accent line */}
       <div className="h-1 bg-gradient-to-r from-accent via-accent-light to-accent" />
 
-      <div className="container-custom py-8 md:py-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+      <div className="container-custom py-10 md:py-14">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 md:gap-10">
 
-          {/* Col 1 — School Info */}
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
+          {/* Col 1 — School Info (Spans 2 cols on mobile, 1 on desktop) */}
+          <div className="col-span-2 lg:col-span-1 flex flex-col items-start text-left space-y-3.5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-accent flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-lg shrink-0">
                 {siteConfig.shortName.charAt(0)}
               </div>
               <div className="text-left">
-                <p className="text-sm font-bold text-white leading-tight">{siteConfig.schoolName}</p>
-                <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest">{siteConfig.affiliationBoard} Affiliated</p>
+                <p className="text-sm sm:text-base font-extrabold text-white leading-tight tracking-tight">{siteConfig.schoolName}</p>
+                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mt-0.5">{siteConfig.affiliationBoard} Affiliated · Est. {siteConfig.foundedYear}</p>
               </div>
             </div>
-            <p className="text-slate-300 text-sm leading-relaxed mb-5">{siteConfig.description}</p>
-            <div className="flex items-center gap-2.5">
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-medium">{siteConfig.description}</p>
+            <div className="flex items-center gap-2 pt-1">
               {Object.entries(siteConfig.socialLinks).map(([platform, url]) => {
                 if (!url) return null;
                 const SvgIcon = socialIcons[platform];
                 if (!SvgIcon) return null;
                 return (
                   <a key={platform} href={url} target="_blank" rel="noopener noreferrer" aria-label={platform}
-                    className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-accent hover:text-white hover:scale-110 transition-all duration-200"
+                    className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:bg-accent hover:text-white hover:scale-105 transition-all duration-200"
                   >
                     <SvgIcon />
                   </a>
@@ -99,16 +99,16 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Col 2 — Quick Links */}
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <span className="w-0.5 h-4 bg-accent rounded-full inline-block" />
+          {/* Col 2 — Quick Links (Left column on mobile 2-grid) */}
+          <div className="col-span-1 flex flex-col items-start text-left">
+            <h4 className="text-xs sm:text-sm font-extrabold text-white mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-wider">
+              <span className="w-1.5 h-3.5 bg-accent rounded-full inline-block" />
               Quick Links
             </h4>
-            <ul className="space-y-1.5">
+            <ul className="space-y-2">
               {quickLinks.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-[13px] text-slate-300 hover:text-accent-light transition-colors hover:translate-x-1 inline-block">
+                  <Link href={link.href} className="text-xs sm:text-sm text-slate-300 hover:text-emerald-400 font-medium transition-colors hover:translate-x-1 inline-block py-0.5">
                     {link.label}
                   </Link>
                 </li>
@@ -116,90 +116,90 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Col 3 — Portals */}
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <span className="w-0.5 h-4 bg-accent rounded-full inline-block" />
+          {/* Col 3 — Portals & Admissions (Right column on mobile 2-grid) */}
+          <div className="col-span-1 flex flex-col items-start text-left">
+            <h4 className="text-xs sm:text-sm font-extrabold text-white mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-wider">
+              <span className="w-1.5 h-3.5 bg-accent rounded-full inline-block" />
               Portals
             </h4>
-            <ul className="space-y-1.5 mb-4">
+            <ul className="space-y-2 mb-4 w-full">
               {portalLinks.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-[13px] text-slate-300 hover:text-accent-light transition-colors hover:translate-x-1 inline-block">
+                  <Link href={link.href} className="text-xs sm:text-sm text-slate-300 hover:text-emerald-400 font-medium transition-colors hover:translate-x-1 inline-block py-0.5">
                     {link.label}
                   </Link>
                 </li>
               ))}
             </ul>
             {siteConfig.admissionOpen && (
-              <div className="p-4 rounded-xl border border-accent/30 bg-accent/10 w-full max-w-[200px] flex flex-col items-center sm:items-start">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <GraduationCap size={14} className="text-accent-light" />
-                  <span className="text-xs font-bold text-accent-light">Admissions Open</span>
+              <div className="p-3 sm:p-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/40 w-full flex flex-col items-start backdrop-blur-sm space-y-1.5 shadow-inner">
+                <div className="flex items-center gap-1.5">
+                  <GraduationCap size={14} className="text-emerald-400" />
+                  <span className="text-[11px] sm:text-xs font-bold text-emerald-300">Admissions Open</span>
                 </div>
-                <p className="text-[11px] text-white/45 mb-3">For {siteConfig.admissionYear}</p>
+                <p className="text-[10px] text-slate-300 font-medium">Session {siteConfig.admissionYear}</p>
                 <Link href="/admissions"
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-accent hover:bg-accent-light px-3 py-1.5 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-3 py-1 rounded-lg transition-all shadow-md cursor-pointer mt-1"
                 >
-                  Apply Now →
+                  Apply →
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Col 4 — Contact */}
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-              <span className="w-0.5 h-4 bg-accent rounded-full inline-block" />
+          {/* Col 4 — Contact Us (Spans 2 cols on mobile, 1 on desktop) */}
+          <div className="col-span-2 lg:col-span-1 flex flex-col items-start text-left pt-2 sm:pt-0 border-t border-white/10 lg:border-t-0">
+            <h4 className="text-xs sm:text-sm font-extrabold text-white mb-3 sm:mb-4 flex items-center gap-2 uppercase tracking-wider">
+              <span className="w-1.5 h-3.5 bg-accent rounded-full inline-block" />
               Contact Us
             </h4>
-            <ul className="space-y-2.5">
-              <li>
-                <a href={`tel:${siteConfig.phone}`} className="flex flex-col sm:flex-row items-center sm:items-start gap-2.5 text-[13px] text-slate-300 hover:text-accent-light transition-colors">
-                  <Phone size={14} className="shrink-0" />
-                  <div>
-                    <p>{siteConfig.phone}</p>
-                    {siteConfig.altPhone && <p className="text-white/35">{siteConfig.altPhone}</p>}
-                  </div>
-                </a>
-              </li>
-              <li>
-                <a href={`mailto:${siteConfig.email}`} className="flex flex-col sm:flex-row items-center sm:items-start gap-2.5 text-[13px] text-slate-300 hover:text-accent-light transition-colors">
-                  <Mail size={14} className="shrink-0" />
-                  <span>{siteConfig.email}</span>
-                </a>
-              </li>
-              <li className="flex flex-col sm:flex-row items-center sm:items-start gap-2.5 text-[13px] text-slate-300">
-                <MapPin size={14} className="shrink-0" />
-                <span>{siteConfig.address}<br />{siteConfig.city}, {siteConfig.state} — {siteConfig.pincode}</span>
-              </li>
-              <li className="flex flex-col sm:flex-row items-center sm:items-start gap-2.5 text-[13px] text-slate-300">
-                <Clock size={14} className="shrink-0" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 w-full">
+              <a href={`tel:${siteConfig.phone}`} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 hover:text-emerald-400 font-medium transition-colors">
+                <Phone size={15} className="shrink-0 text-emerald-400 mt-0.5" />
+                <div>
+                  <p>{siteConfig.phone}</p>
+                  {siteConfig.altPhone && <p className="text-slate-400 text-xs mt-0.5">{siteConfig.altPhone}</p>}
+                </div>
+              </a>
+
+              <a href={`mailto:${siteConfig.email}`} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 hover:text-emerald-400 font-medium transition-colors">
+                <Mail size={15} className="shrink-0 text-emerald-400 mt-0.5" />
+                <span className="break-all">{siteConfig.email}</span>
+              </a>
+
+              <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 font-medium">
+                <MapPin size={15} className="shrink-0 text-emerald-400 mt-0.5" />
+                <span>{siteConfig.address}, {siteConfig.city}, {siteConfig.state} — {siteConfig.pincode}</span>
+              </div>
+
+              <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 font-medium">
+                <Clock size={15} className="shrink-0 text-emerald-400 mt-0.5" />
                 <span>{siteConfig.workingHours}</span>
-              </li>
-            </ul>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/10">
-        <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-[11px] text-white/40">
-            © {new Date().getFullYear()} {siteConfig.schoolName}. All rights reserved. <span className="mx-1 font-bold text-white/20">|</span> <span className="text-emerald-400 font-semibold tracking-wide">Powered by Team Axiogen</span>
+      <div className="border-t border-white/10 bg-slate-950/60">
+        <div className="container-custom py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <p className="text-xs text-slate-400 font-medium">
+            © {new Date().getFullYear()} {siteConfig.schoolName}. All rights reserved. <span className="hidden sm:inline mx-1.5 text-white/20">|</span> <br className="sm:hidden" /><span className="text-emerald-400 font-semibold tracking-wide">Powered by Team Axiogen</span>
           </p>
-          <div className="flex items-center gap-5">
-            <Link href="#" className="text-[11px] text-white/35 hover:text-white/60 transition-colors">Privacy Policy</Link>
-            <Link href="#" className="text-[11px] text-white/35 hover:text-white/60 transition-colors">Terms of Use</Link>
+          <div className="flex items-center gap-6">
+            <Link href="#" className="text-xs text-slate-400 hover:text-white transition-colors font-medium">Privacy Policy</Link>
+            <Link href="#" className="text-xs text-slate-400 hover:text-white transition-colors font-medium">Terms of Use</Link>
           </div>
         </div>
       </div>
 
       {/* Scroll-to-top */}
       <button onClick={scrollToTop} aria-label="Scroll to top"
-        className="fixed bottom-6 right-6 w-10 h-10 rounded-full bg-accent text-white shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-40"
+        className="fixed bottom-6 right-6 w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/25 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-40 cursor-pointer"
       >
-        <ArrowUp size={16} />
+        <ArrowUp size={18} className="stroke-[3]" />
       </button>
     </footer>
   );

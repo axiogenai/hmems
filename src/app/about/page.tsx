@@ -29,7 +29,26 @@ const milestones = [
   { year: "2024", title: "Best School Award", desc: "Recognized as the Best School in the district by the Education Board." },
 ];
 
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+
 export default function AboutPage() {
+  const [config] = useLocalStorage("admin-school-config", {
+    schoolName: siteConfig.schoolName as string,
+    tagline: siteConfig.tagline as string,
+    foundedYear: siteConfig.foundedYear as number,
+    phone: siteConfig.phone as string,
+    email: siteConfig.email as string,
+    principalName: "School Principal",
+    principalRole: "M.A., B.Ed · Leadership Team",
+    principalMessage: `Education is not the filling of a pail, but the lighting of a fire. At ${siteConfig.schoolName}, we believe every child carries within them an extraordinary potential. Our role as educators is to kindle that spark — to inspire curiosity, build resilience, and nurture the values that will guide them throughout their lives.\n\nWe are committed to creating an environment where academic rigor meets compassionate mentorship, where every student feels seen, valued, and empowered to achieve greatness.`
+  });
+
+  const prName = config.principalName || "School Principal";
+  const prRole = config.principalRole || `Principal, ${siteConfig.schoolName}`;
+  const prMessage = config.principalMessage || `Education is not the filling of a pail, but the lighting of a fire. At ${siteConfig.schoolName}, we believe every child carries within them an extraordinary potential. Our role as educators is to kindle that spark — to inspire curiosity, build resilience, and nurture the values that will guide them throughout their lives.`;
+
+  const initials = prName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "HM";
+
   return (
     <div>
       <PageHeader title="About Us" breadcrumb="About Us" />
@@ -129,17 +148,17 @@ export default function AboutPage() {
             <div className="relative bg-white rounded-3xl p-8 md:p-12 border border-border shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
               <div className="text-8xl text-accent/10 font-serif absolute top-4 left-6 leading-none select-none">&ldquo;</div>
               <div className="relative z-10">
-                <p className="text-lg md:text-xl text-slate-700 leading-relaxed italic mb-8">
-                  Education is not the filling of a pail, but the lighting of a fire. At {siteConfig.schoolName}, we believe every child carries within them an extraordinary potential. Our role as educators is to kindle that spark — to inspire curiosity, build resilience, and nurture the values that will guide them throughout their lives.
-                  <br /><br />
-                  We are committed to creating an environment where academic rigor meets compassionate mentorship, where every student feels seen, valued, and empowered to achieve greatness.
-                </p>
+                <div className="text-lg md:text-xl text-slate-700 leading-relaxed italic mb-8 whitespace-pre-line">
+                  {prMessage}
+                </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg shadow-lg">SK</div>
+                  <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    {initials}
+                  </div>
                   <div>
-                    <p className="font-bold text-primary text-lg">Dr. Sanjay Kumar</p>
+                    <p className="font-bold text-primary text-lg">{prName}</p>
                     <p className="text-slate-500 text-sm">Principal, {siteConfig.schoolName}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Ph.D. in Education · 25 Years Experience</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{prRole}</p>
                   </div>
                 </div>
               </div>

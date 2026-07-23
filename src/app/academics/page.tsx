@@ -83,7 +83,6 @@ export default function AcademicsPage() {
               return (
                 <FadeIn key={i} delay={i * 0.1} className="h-full">
                   <div className="bg-white rounded-3xl border border-border shadow-[0_2px_8px_rgba(0,0,0,0.08)] overflow-hidden hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 h-full flex flex-col">
-                    <div className={`h-2 bg-gradient-to-r ${colors[i]} shrink-0`} />
                     <div className="p-5 text-center flex-1 flex flex-col items-center justify-between">
                       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors[i]} flex items-center justify-center mx-auto mb-3 shrink-0`}>
                         <BookOpen size={20} className="text-white" />

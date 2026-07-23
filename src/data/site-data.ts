@@ -209,89 +209,17 @@ Don't miss out – **limited seats available** in all grades!`,
   },
 ];
 
-// Demo data: Faculty
-export const faculty = [
-  {
-    id: 1,
-    name: "Dr. Sanjay Kumar",
-    role: "Principal",
-    department: "Administration",
-    qualification: "Ph.D. in Education, M.Ed.",
-    experience: "25 years",
-    avatar: "/images/faculty/principal.jpg",
-    bio: "Visionary leader with 25 years of experience in shaping educational institutions. Passionate about integrating technology with traditional teaching methodologies.",
-  },
-  {
-    id: 2,
-    name: "Mrs. Kavitha Nair",
-    role: "Vice Principal",
-    department: "Administration",
-    qualification: "M.A. English, B.Ed.",
-    experience: "20 years",
-    avatar: "/images/faculty/vice-principal.jpg",
-    bio: "Dedicated educator specializing in curriculum development and student counseling. Leads the school's quality assurance initiatives.",
-  },
-  {
-    id: 3,
-    name: "Mr. Rahul Verma",
-    role: "Head of Science",
-    department: "Science",
-    qualification: "M.Sc. Physics, B.Ed.",
-    experience: "15 years",
-    avatar: "/images/faculty/science-head.jpg",
-    bio: "Award-winning science teacher known for innovative lab experiments and consistently producing top board exam results.",
-  },
-  {
-    id: 4,
-    name: "Mrs. Sunita Deshpande",
-    role: "Head of Mathematics",
-    department: "Mathematics",
-    qualification: "M.Sc. Mathematics, B.Ed.",
-    experience: "18 years",
-    avatar: "/images/faculty/math-head.jpg",
-    bio: "Expert in making mathematics accessible and enjoyable. Her students consistently score among the top in district-level olympiads.",
-  },
-  {
-    id: 5,
-    name: "Mr. Abhishek Jain",
-    role: "Head of English",
-    department: "English",
-    qualification: "M.A. English Literature, CELTA",
-    experience: "12 years",
-    avatar: "/images/faculty/english-head.jpg",
-    bio: "Passionate about creative writing and debate. Coaches the school's award-winning debate team and literary magazine.",
-  },
-  {
-    id: 6,
-    name: "Mrs. Pooja Sharma",
-    role: "Computer Science Teacher",
-    department: "Computer Science",
-    qualification: "MCA, B.Ed.",
-    experience: "10 years",
-    avatar: "/images/faculty/cs-teacher.jpg",
-    bio: "Specializes in coding education and robotics. Leads the school's coding club and prepares students for national-level hackathons.",
-  },
-  {
-    id: 7,
-    name: "Mr. Deepak Patil",
-    role: "Physical Education",
-    department: "Sports",
-    qualification: "M.P.Ed., NIS Diploma",
-    experience: "14 years",
-    avatar: "/images/faculty/pe-teacher.jpg",
-    bio: "Former state-level athlete who trains students in cricket, athletics, and basketball. Several students have represented at district and state levels.",
-  },
-  {
-    id: 8,
-    name: "Mrs. Anjali Gupta",
-    role: "Art & Craft Teacher",
-    department: "Arts",
-    qualification: "BFA, Diploma in Art Education",
-    experience: "8 years",
-    avatar: "/images/faculty/art-teacher.jpg",
-    bio: "Encourages creativity through painting, sculpture, and digital art. Her students have won national-level art competitions.",
-  },
-];
+// Demo data: Faculty (Now loaded dynamically from Supabase database)
+export const faculty: Array<{
+  id: number;
+  name: string;
+  role: string;
+  department: string;
+  qualification: string;
+  experience: string;
+  avatar: string;
+  bio: string;
+}> = [];
 
 // Demo data: Achievements
 export const achievements = [
